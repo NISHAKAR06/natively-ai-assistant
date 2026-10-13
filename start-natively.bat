@@ -1,5 +1,6 @@
 @echo off
-set "APP_DIR=c:\Users\NISHAKART\OneDrive\Documents\NISHAKAR\AI_assistent\natively-cluely-ai-assistant"
+set "APP_DIR=%~dp0"
+if "%APP_DIR:~-1%"=="\" set "APP_DIR=%APP_DIR:~0,-1%"
 if /I "%~1"=="stop" (
     call "%APP_DIR%\stop-natively.bat"
     exit /b 0

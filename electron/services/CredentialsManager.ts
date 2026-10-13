@@ -1060,6 +1060,17 @@ export class CredentialsManager {
             }
             return 'natively';
         }
+        // In 100% free local mode (USE_OLLAMA=true), if sttProvider is 'none' or points to a
+        // cloud provider ('groq'/'google') that has no API key configured, use 'local-whisper'.
+        if (process.env.USE_OLLAMA === 'true') {
+            if (
+                provider === 'none' ||
+                (provider === 'groq' && !this.credentials.groqSttApiKey && !this.credentials.groqApiKey) ||
+                (provider === 'google' && !this.credentials.googleServiceAccountPath)
+            ) {
+                return 'local-whisper';
+            }
+        }
         return provider;
     }
 
