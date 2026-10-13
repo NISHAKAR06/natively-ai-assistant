@@ -104,7 +104,22 @@ export class LocalKnowledgeOrchestrator {
       if (fs.existsSync(this.storagePath)) {
         const raw = fs.readFileSync(this.storagePath, 'utf8');
         const parsed = JSON.parse(raw);
-        if (parsed.activeResume) this.activeResume = parsed.activeResume;
+        if (parsed.activeResume) {
+          this.activeResume = parsed.activeResume;
+          if (
+            (this.activeResume?.structured_data?.identity?.name === 'Page 1' ||
+             !this.activeResume?.structured_data?.projects?.length) &&
+            this.activeResume?.raw_text
+          ) {
+            console.log('[LocalKnowledgeOrchestrator] Upgrading resume cache with advanced parsing...');
+            const fixed = this.parseResumeTextAdvanced(
+              this.activeResume.raw_text,
+              this.activeResume.file_name || 'Resume'
+            );
+            this.activeResume.structured_data = fixed;
+            this.saveToDisk();
+          }
+        }
         if (parsed.activeJD) this.activeJD = parsed.activeJD;
         if (typeof parsed.knowledgeMode === 'boolean') this.knowledgeMode = parsed.knowledgeMode;
         console.log('[LocalKnowledgeOrchestrator] Loaded profile from disk:', {
@@ -148,7 +163,15 @@ export class LocalKnowledgeOrchestrator {
       const isResume = String(docType).toLowerCase().includes('resume');
 
       if (isResume) {
-        const structured = this.parseResumeText(content, fileName);
+        let structured: StructuredResume | null = null;
+        try {
+          structured = await this.parseWithOllama(content, true);
+        } catch (e) {
+          console.warn('[LocalKnowledgeOrchestrator] Ollama extraction error:', e);
+        }
+        if (!structured || !structured.identity?.name || structured.identity.name.toLowerCase() === 'page 1') {
+          structured = this.parseResumeTextAdvanced(content, fileName);
+        }
         this.activeResume = {
           id: 1,
           file_path: filePath,
@@ -160,7 +183,15 @@ export class LocalKnowledgeOrchestrator {
         this.indexIntoLocalRAG('resume', content, fileName);
         return { success: true, document: { id: 1, type: DocType.RESUME, name: fileName } };
       } else {
-        const structured = this.parseJdText(content, fileName);
+        let structured: StructuredJD | null = null;
+        try {
+          structured = await this.parseWithOllama(content, false);
+        } catch (e) {
+          console.warn('[LocalKnowledgeOrchestrator] Ollama JD extraction error:', e);
+        }
+        if (!structured || !structured.title) {
+          structured = this.parseJdText(content, fileName);
+        }
         this.activeJD = {
           id: 2,
           file_path: filePath,
@@ -178,24 +209,121 @@ export class LocalKnowledgeOrchestrator {
     }
   }
 
-  private parseResumeText(text: string, fallbackFileName: string): StructuredResume {
-    const lines = text
+  private async parseWithOllama(text: string, isResume: boolean): Promise<any | null> {
+    try {
+      const prompt = isResume
+        ? `You are an expert resume parsing engine. Extract candidate details from this resume text into JSON strictly conforming to this schema:
+{
+  "identity": {
+    "name": "Full Name",
+    "role": "Current or Target Title",
+    "email": "Email address",
+    "phone": "Phone number",
+    "location": "City, Country",
+    "summary": "2-3 sentence executive professional summary of their expertise",
+    "totalExperienceYears": number
+  },
+  "experience": [
+    {
+      "role": "Job Title",
+      "company": "Company Name",
+      "duration": "Duration (e.g. Aug 2026 - Present)",
+      "highlights": ["bullet 1", "bullet 2"]
+    }
+  ],
+  "projects": [
+    {
+      "name": "Project Name",
+      "description": "Short project description",
+      "technologies": ["tech 1", "tech 2"],
+      "highlights": ["bullet 1", "bullet 2"]
+    }
+  ],
+  "education": [
+    {
+      "degree": "Degree (e.g. B.Tech in Artificial Intelligence and Machine Learning)",
+      "field": "Field of Study",
+      "institution": "University / College Name"
+    }
+  ],
+  "skills": ["Skill 1", "Skill 2"]
+}
+
+Resume Text:
+${text.slice(0, 8000)}`
+        : `You are an expert job description parser. Extract job details from this job description text into JSON strictly conforming to this schema:
+{
+  "title": "Job Title",
+  "role": "Role Title",
+  "company": "Company Name",
+  "description_summary": "Summary of role and mission",
+  "requirements": ["requirement 1", "requirement 2"],
+  "skills": ["Skill 1", "Skill 2"]
+}
+
+Job Description Text:
+${text.slice(0, 8000)}`;
+
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 20000);
+
+      const res = await fetch('http://127.0.0.1:11434/api/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        signal: controller.signal,
+        body: JSON.stringify({
+          model: 'qwen2.5-coder:7b',
+          prompt,
+          format: 'json',
+          stream: false,
+          options: { temperature: 0.1, num_predict: 2048 }
+        })
+      });
+      clearTimeout(timeout);
+
+      if (!res.ok) return null;
+      const body: any = await res.json();
+      if (!body?.response) return null;
+      const parsed = JSON.parse(body.response);
+      if (isResume && parsed.identity?.name && parsed.identity.name.toLowerCase() !== 'page 1') {
+        parsed.skillsFlat = Array.isArray(parsed.skills) ? parsed.skills : [];
+        parsed._extraction_mode = 'llm';
+        return parsed;
+      }
+      if (!isResume && parsed.title) {
+        return parsed;
+      }
+    } catch (err: any) {
+      console.warn('[LocalKnowledgeOrchestrator] Ollama extraction skipped (fallback to rules):', err?.message || err);
+    }
+    return null;
+  }
+
+  private parseResumeTextAdvanced(text: string, fallbackFileName: string): StructuredResume {
+    const cleanText = text.replace(/\[Page \d+\]/g, '').trim();
+    const lines = cleanText
       .split(/\r?\n/)
       .map((l) => l.trim())
       .filter(Boolean);
 
-    // 1. Name heuristic
+    // 1. Name: First line that is 2-40 chars, does not contain @, http, .com, +91, |, page, resume, curriculum
     let name = '';
-    for (let i = 0; i < Math.min(5, lines.length); i++) {
+    for (let i = 0; i < Math.min(8, lines.length); i++) {
       const line = lines[i];
+      const lower = line.toLowerCase();
       if (
-        line.length > 2 &&
-        line.length < 40 &&
+        line.length >= 2 &&
+        line.length <= 45 &&
         !line.includes('@') &&
         !line.includes('http') &&
-        !line.toLowerCase().includes('resume') &&
-        !line.toLowerCase().includes('curriculum') &&
-        !line.includes('|')
+        !line.includes('.com') &&
+        !line.includes('+') &&
+        !line.includes('|') &&
+        !lower.startsWith('page ') &&
+        !lower.includes('curriculum') &&
+        !lower.includes('resume') &&
+        !lower.includes('summary') &&
+        !lower.includes('experience')
       ) {
         name = line.replace(/[^\w\s.-]/g, '').trim();
         break;
@@ -205,77 +333,151 @@ export class LocalKnowledgeOrchestrator {
       name = path.parse(fallbackFileName).name.replace(/[-_]/g, ' ');
     }
 
-    // 2. Role heuristic
-    let role = 'Software Professional';
-    const roleKeywords = [
-      'Software Engineer', 'Senior Software Engineer', 'Full Stack Developer',
-      'Backend Engineer', 'Frontend Engineer', 'DevOps Engineer', 'System Architect',
-      'Data Engineer', 'Data Scientist', 'Machine Learning Engineer', 'Engineering Lead'
+    // 2. Email, phone, location
+    const emailMatch = cleanText.match(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/);
+    const email = emailMatch ? emailMatch[0] : undefined;
+
+    const phoneMatch = cleanText.match(/(?:\+?\d{1,3}[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}|\+91\s*\d{10}/);
+    const phone = phoneMatch ? phoneMatch[0] : undefined;
+
+    const locationMatch = cleanText.match(/(?:^|\n|[|•])\s*([A-Za-z\s]+,\s*(?:India|USA|UK|Canada|Germany|Singapore|Australia|[A-Z]{2}))/);
+    const location = locationMatch ? locationMatch[1].trim() : undefined;
+
+    // 3. Section segmentation
+    const sections: Record<string, string[]> = {};
+    let curSection = 'header';
+    const sectionKeywords = [
+      'summary', 'objective', 'about', 'experience', 'work experience', 'employment',
+      'projects', 'personal projects', 'skills', 'technical skills', 'education',
+      'achievements', 'certifications', 'awards'
     ];
-    for (const rk of roleKeywords) {
-      if (new RegExp(`\\b${rk}\\b`, 'i').test(text)) {
-        role = rk;
-        break;
+
+    for (const line of lines) {
+      const lower = line.toLowerCase().replace(/[:—–-]/g, '').trim();
+      const matchedSec = sectionKeywords.find((sk) => lower === sk);
+      if (matchedSec) {
+        curSection = matchedSec.includes('exp') ? 'experience'
+          : matchedSec.includes('proj') ? 'projects'
+          : matchedSec.includes('skill') ? 'skills'
+          : matchedSec.includes('edu') ? 'education'
+          : matchedSec.includes('summary') || matchedSec.includes('about') || matchedSec.includes('obj') ? 'summary'
+          : matchedSec;
+        sections[curSection] = [];
+      } else {
+        if (!sections[curSection]) sections[curSection] = [];
+        sections[curSection].push(line);
       }
     }
 
-    // 3. Contact & Location
-    const emailMatch = text.match(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/);
-    const email = emailMatch ? emailMatch[0] : undefined;
+    // 4. Summary extraction
+    let summary = '';
+    const summaryLines = sections['summary'] || [];
+    if (summaryLines.length > 0) {
+      summary = summaryLines.filter((l) => !l.includes('@') && !l.includes('http') && !l.includes('.com')).join(' ');
+    }
+    if (!summary) {
+      for (const line of lines.slice(1, 10)) {
+        if (line.length > 50 && !line.includes('@') && !line.includes('http') && !line.includes('.com') && !line.includes('|')) {
+          summary = line;
+          break;
+        }
+      }
+    }
 
-    const phoneMatch = text.match(/(?:\+?\d{1,3}[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}/);
-    const phone = phoneMatch ? phoneMatch[0] : undefined;
+    // 5. Experience extraction
+    const expLines = sections['experience'] || [];
+    const expList: ProfileExperience[] = [];
+    let curExp: ProfileExperience | null = null;
+    for (const l of expLines) {
+      if (l.startsWith('•') || l.startsWith('-') || l.startsWith('*')) {
+        if (curExp) curExp.highlights.push(l);
+      } else if (l.includes('—') || l.includes('–') || l.includes(' - ') || /\b(intern|engineer|developer|lead|analyst|consultant)\b/i.test(l)) {
+        const parts = l.split(/[—–]|\s+-\s+/);
+        const company = (parts[0] || 'Company').trim();
+        const rawRole = (parts[1] || 'Software Professional').replace(/\(.*?\)/, '').trim();
+        const role = rawRole.replace(/\s+(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec|\d{4}).*/i, '').trim();
+        const durationMatch = l.match(/(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec|\d{4})\s*[\d\s–—-]+(?:Present|\d{4})/i);
+        curExp = {
+          company,
+          role,
+          duration: durationMatch ? durationMatch[0].trim() : undefined,
+          highlights: [],
+        };
+        expList.push(curExp);
+      }
+    }
 
-    const locationMatch = text.match(/\b([A-Z][a-zA-Z\s]+,\s*[A-Z]{2,}|Remote|Bengaluru|San Francisco|New York|London|Seattle|Austin|India|USA)\b/);
-    const location = locationMatch ? locationMatch[0] : undefined;
+    // 6. Projects extraction
+    const projLines = sections['projects'] || [];
+    const projList: ProfileProject[] = [];
+    let curProj: ProfileProject | null = null;
+    for (const l of projLines) {
+      if (l.startsWith('•') || l.startsWith('-') || l.startsWith('*')) {
+        if (curProj) curProj.highlights.push(l);
+      } else if (l.includes('—') || l.includes('–') || l.includes('|') || l.includes(' - ')) {
+        const parts = l.split(/[—–|]|\s+-\s+/);
+        const pName = (parts[0] || 'Project').trim();
+        const pDesc = (parts[1] || '').trim();
+        const pTech = (parts[2] || '').split(/[,|]/).map((s) => s.trim()).filter((s) => s.length > 1 && s.length < 25);
+        curProj = {
+          name: pName,
+          description: pDesc,
+          technologies: pTech,
+          highlights: [],
+        };
+        projList.push(curProj);
+      }
+    }
 
-    // 4. Skills extraction
+    // 7. Education extraction
+    const eduLines = sections['education'] || [];
+    const eduList: ProfileEducation[] = [];
+    if (eduLines.length > 0) {
+      const inst = eduLines[0] || 'University';
+      const degLine = eduLines[1] || eduLines[0] || '';
+      const degMatch = degLine.match(/(B\.Tech|B\.E|B\.S|Bachelor|M\.Tech|M\.S|Master|Ph\.D)[^—,\n]*/i);
+      const degree = degMatch ? degMatch[0].trim() : 'Degree';
+      const fieldMatch = degLine.match(/\bin\s+([^—,\n]+)/i);
+      const field = fieldMatch ? fieldMatch[1].trim() : 'Engineering';
+      eduList.push({
+        institution: inst,
+        degree,
+        field,
+      });
+    }
+
+    // 8. Skills extraction
     const foundSkills = new Set<string>();
-    const lowerText = text.toLowerCase();
     for (const skill of COMMON_SKILLS) {
       const pattern = new RegExp(`\\b${skill.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i');
-      if (pattern.test(text)) {
+      if (pattern.test(cleanText)) {
         foundSkills.add(skill);
       }
     }
     const skillsList = Array.from(foundSkills);
-    if (skillsList.length === 0) {
-      skillsList.push('Problem Solving', 'Software Engineering', 'System Architecture');
-    }
 
-    // 5. Experience years
-    let totalExperienceYears = 3;
-    const yearMatches = Array.from(text.matchAll(/\b(20\d{2})\b/g)).map((m) => parseInt(m[1], 10));
-    if (yearMatches.length >= 2) {
-      const minYear = Math.min(...yearMatches);
-      const maxYear = Math.max(...yearMatches);
-      const diff = maxYear - minYear;
-      if (diff > 0 && diff <= 30) {
-        totalExperienceYears = diff;
+    // 9. Role heuristic
+    let role = expList[0]?.role || '';
+    if (!role || role === 'Software Professional') {
+      const roleKeywords = [
+        'AI/ML Engineer', 'AI & Data Science Intern', 'Machine Learning Engineer',
+        'Senior Software Engineer', 'Full Stack Developer', 'Backend Engineer',
+        'Frontend Engineer', 'Data Scientist', 'DevOps Engineer'
+      ];
+      for (const rk of roleKeywords) {
+        if (new RegExp(`\\b${rk}\\b`, 'i').test(cleanText)) {
+          role = rk;
+          break;
+        }
       }
     }
+    if (!role) role = 'Software Professional';
 
-    // 6. Summary
-    let summary = '';
-    for (const line of lines.slice(0, 15)) {
-      if (line.length > 50 && !line.includes('@') && !line.includes('http')) {
-        summary = line;
-        break;
-      }
-    }
+    let totalExperienceYears = Math.max(1, expList.length);
+
     if (!summary) {
-      summary = `${name} is an experienced ${role} with strong background in ${skillsList.slice(0, 4).join(', ')}.`;
+      summary = `${name} is a ${role} with strong background in ${skillsList.slice(0, 5).join(', ')}.`;
     }
-
-    // 7. Experience items
-    const expList: ProfileExperience[] = [
-      {
-        role,
-        company: 'Key Experience',
-        duration: `${totalExperienceYears} years`,
-        highlights: lines.filter((l) => l.startsWith('•') || l.startsWith('-') || l.startsWith('*')).slice(0, 5),
-      },
-    ];
 
     return {
       identity: {
@@ -287,11 +489,18 @@ export class LocalKnowledgeOrchestrator {
         summary,
         totalExperienceYears,
       },
-      experience: expList,
+      experience: expList.length > 0 ? expList : [
+        {
+          role,
+          company: 'Industry Experience',
+          duration: `${totalExperienceYears} years`,
+          highlights: lines.filter((l) => l.startsWith('•')).slice(0, 5),
+        }
+      ],
       skills: skillsList,
       skillsFlat: skillsList,
-      projects: [],
-      education: [],
+      projects: projList,
+      education: eduList,
       _extraction_mode: 'heuristic',
     };
   }

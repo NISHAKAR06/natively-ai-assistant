@@ -18,6 +18,7 @@ import { fileURLToPath, pathToFileURL } from 'url';
 export const SAFE_DOCUMENT_EXTENSIONS = new Set([
   '.txt', '.md', '.markdown', '.json', '.csv', '.tsv',
   '.xml', '.html', '.htm', '.log', '.pdf', '.docx',
+  '.png', '.jpg', '.jpeg', '.webp',
   // Source and config files (2026-09-10). A code-review mode could attach its
   // notes, its error log and its test results but NOT the code under review:
   // `debug_code_snippet.ts` was refused with `reference_upload_failed` while
@@ -305,9 +306,29 @@ export const extractSafeDocumentText = async (
       parseTimeoutMs,
     );
     content = String(data?.value || '');
+  } else if (['.png', '.jpg', '.jpeg', '.webp'].includes(extension)) {
+    try {
+      const { OcrProviderManager } = require('./screen/OcrProviderManager');
+      const ocrManager = new OcrProviderManager();
+      const ocrRes = await ocrManager.recognize(filePath);
+      content = ocrRes?.text || '';
+    } catch (e: any) {
+      console.warn('[SafeDocumentTextExtractor] OCR failed for image:', e?.message || e);
+    }
   } else {
     content = parseTextFile(binary, fileName, extension);
     if (HTML_EXTENSIONS.has(extension)) content = htmlToText(content);
+  }
+
+  if (!content.trim() && extension === '.pdf') {
+    try {
+      const { OcrProviderManager } = require('./screen/OcrProviderManager');
+      const ocrManager = new OcrProviderManager();
+      const ocrRes = await ocrManager.recognize(filePath);
+      if (ocrRes?.text) content = ocrRes.text;
+    } catch (e: any) {
+      console.warn('[SafeDocumentTextExtractor] Scanned PDF OCR fallback failed:', e?.message || e);
+    }
   }
 
   if (!content.trim()) throw new Error('file parsed to empty text');
