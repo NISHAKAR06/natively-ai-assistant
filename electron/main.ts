@@ -1321,7 +1321,9 @@ try {
     KnowledgeDatabaseManagerClass = require('../premium/electron/knowledge/KnowledgeDatabaseManager').KnowledgeDatabaseManager;
     textHasCompEvidence = require('../premium/electron/knowledge/NegotiationConversationTracker').textHasCompEvidence;
 } catch {
-    console.log('[Main] Knowledge modules not available — profile intelligence disabled.');
+    const { LocalKnowledgeOrchestrator } = require('./services/knowledge/LocalKnowledgeOrchestrator');
+    KnowledgeOrchestratorClass = LocalKnowledgeOrchestrator;
+    console.log('[Main] Using LocalKnowledgeOrchestrator for 100% free offline profile & resume intelligence.');
 }
 
 import { CredentialsManager } from "./services/CredentialsManager"
@@ -2693,8 +2695,10 @@ export class AppState {
       const db = DatabaseManager.getInstance();
       const sqliteDb = db.getDb();
 
-      if (sqliteDb && KnowledgeDatabaseManagerClass && KnowledgeOrchestratorClass) {
-        const knowledgeDb = new KnowledgeDatabaseManagerClass(sqliteDb);
+      if (sqliteDb && KnowledgeOrchestratorClass) {
+        const knowledgeDb = KnowledgeDatabaseManagerClass
+          ? new KnowledgeDatabaseManagerClass(sqliteDb)
+          : sqliteDb;
         this.knowledgeOrchestrator = new KnowledgeOrchestratorClass(knowledgeDb);
 
         // Role Insight owns its own tables in the same SQLite file. It needs the
