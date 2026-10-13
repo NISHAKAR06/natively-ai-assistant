@@ -13089,7 +13089,7 @@ export function initializeIpcHandlers(appState: AppState): void {
         // main never disagree about who is "key-less".
         hasOwnAiKey: hasOwnAiKey(creds, { codexReady: codexRouteReady() }),
         googleServiceAccountPath: creds.googleServiceAccountPath || null,
-        sttProvider: creds.sttProvider || 'none',
+        sttProvider: CredentialsManager.getInstance().getSttProvider(),
         nvidiaNimSttModel: creds.nvidiaNimSttModel || 'nemotron-asr-streaming',
         groqSttModel: creds.groqSttModel || 'whisper-large-v3-turbo',
         // Resolved, not raw: a stored id the catalogue has since dropped reads

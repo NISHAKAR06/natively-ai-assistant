@@ -452,6 +452,20 @@ export class CredentialsManager {
      */
     public init(): void {
         this.loadCredentials();
+        if (process.env.USE_OLLAMA === 'true') {
+            if (
+                !this.credentials.sttProvider ||
+                this.credentials.sttProvider === 'none' ||
+                (this.credentials.sttProvider === 'groq' && !this.credentials.groqSttApiKey && !this.credentials.groqApiKey) ||
+                (this.credentials.sttProvider === 'google' && !this.credentials.googleServiceAccountPath)
+            ) {
+                this.credentials.sttProvider = 'local-whisper';
+                if (!this.wasExistingStoreUnreadable()) {
+                    this.saveCredentials();
+                }
+                console.log('[CredentialsManager] Defaulted sttProvider to local-whisper for 100% free offline mode');
+            }
+        }
         console.log('[CredentialsManager] Initialized');
         // One-shot diagnostic so we can confirm, from real telemetry, WHICH
         // population hits the "key not persisted" path: the expected Linux-
