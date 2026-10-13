@@ -1064,6 +1064,8 @@ export interface ElectronAPI {
   profileSetMode: (enabled: boolean) => Promise<{ success: boolean; error?: string }>
   profileDelete: () => Promise<{ success: boolean; error?: string }>
   profileGetProfile: () => Promise<any>
+  profileUpdateProfile: (updates: any) => Promise<{ success: boolean; profile?: any; error?: string }>
+  profileSyncGithub: (usernameOrUrl?: string) => Promise<{ success: boolean; count: number; repositories: any[]; error?: string }>
   profileGetCompanyDossier: () => Promise<any | null>
   profileSelectFile: () => Promise<{ success?: boolean; cancelled?: boolean; filePath?: string; error?: string }>
 

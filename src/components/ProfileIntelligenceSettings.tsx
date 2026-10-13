@@ -4,6 +4,7 @@ import {
     Building2, Search, AlertCircle, AlertTriangle, Gift, Info, Star,
     User, CheckCircle, ArrowUpRight, ChevronRight, Paperclip, FileText,
     GraduationCap, FolderKanban, Layers, Mail, MessageSquare, Target,
+    Edit3, Save, Github, Code, ExternalLink, Plus,
 } from 'lucide-react';
 import { ThinkingOrb } from 'thinking-orbs';
 import { useToggleInit } from './settings/useToggleInit';
@@ -2058,6 +2059,101 @@ export function ProfileIntelligenceSettings({
     // the writer.
     const profileAbortRef = useRef<{ cancelled: boolean }>({ cancelled: false });
     const [profileData, setProfileData] = useState<any>(null);
+    const [isEditingProfile, setIsEditingProfile] = useState(false);
+    const [editForm, setEditForm] = useState<any>({
+        name: '',
+        role: '',
+        totalExperienceYears: 1,
+        location: '',
+        email: '',
+        phone: '',
+        github: '',
+        linkedin: '',
+        summary: '',
+        skills: '',
+    });
+    const [isSavingProfile, setIsSavingProfile] = useState(false);
+    const [isSyncingGithub, setIsSyncingGithub] = useState(false);
+    const [githubSyncMsg, setGithubSyncMsg] = useState('');
+
+    const openProfileEditor = () => {
+        const id = profileData?.identity || {};
+        const skillsText = (profileData?.skillsFlat || profileData?.skills || []).join(', ');
+        setEditForm({
+            name: id.name || profileStatus.name || '',
+            role: id.role || profileStatus.role || '',
+            totalExperienceYears: profileStatus.totalExperienceYears != null ? profileStatus.totalExperienceYears : (id.totalExperienceYears ?? 1),
+            location: id.location || '',
+            email: id.email || '',
+            phone: id.phone || '',
+            github: id.github || '',
+            linkedin: id.linkedin || '',
+            summary: id.summary || '',
+            skills: skillsText,
+        });
+        setIsEditingProfile(true);
+    };
+
+    const handleSaveProfile = async () => {
+        setIsSavingProfile(true);
+        try {
+            const skillsArray = typeof editForm.skills === 'string'
+                ? editForm.skills.split(/[,|\n]/).map((s: string) => s.trim()).filter(Boolean)
+                : [];
+            const updates = {
+                identity: {
+                    name: editForm.name,
+                    role: editForm.role,
+                    totalExperienceYears: Number(editForm.totalExperienceYears) || 0,
+                    location: editForm.location,
+                    email: editForm.email,
+                    phone: editForm.phone,
+                    github: editForm.github,
+                    linkedin: editForm.linkedin,
+                    summary: editForm.summary,
+                },
+                totalExperienceYears: Number(editForm.totalExperienceYears) || 0,
+                skills: skillsArray.length > 0 ? skillsArray : undefined,
+                skillsFlat: skillsArray.length > 0 ? skillsArray : undefined,
+            };
+            const res = await window.electronAPI?.profileUpdateProfile?.(updates);
+            if (res?.success) {
+                setProfileStatus(prev => ({
+                    ...prev,
+                    name: editForm.name,
+                    role: editForm.role,
+                    totalExperienceYears: Number(editForm.totalExperienceYears) || 0,
+                }));
+                const fresh = await window.electronAPI?.profileGetProfile?.();
+                setProfileData(fresh ?? null);
+                setIsEditingProfile(false);
+            }
+        } catch (e) {
+            console.error('Failed to update profile:', e);
+        } finally {
+            setIsSavingProfile(false);
+        }
+    };
+
+    const handleSyncGithub = async () => {
+        setIsSyncingGithub(true);
+        setGithubSyncMsg('');
+        try {
+            const ghInput = editForm.github || profileData?.identity?.github || 'NISHAKAR06';
+            const res = await window.electronAPI?.profileSyncGithub?.(ghInput);
+            if (res?.success) {
+                setGithubSyncMsg(`Successfully synced ${res.count} repositories! Indexed for AI interview code grounding.`);
+                const fresh = await window.electronAPI?.profileGetProfile?.();
+                setProfileData(fresh ?? null);
+            } else {
+                setGithubSyncMsg(res?.error || 'GitHub sync failed');
+            }
+        } catch (e: any) {
+            setGithubSyncMsg(e?.message || 'GitHub sync failed');
+        } finally {
+            setIsSyncingGithub(false);
+        }
+    };
     // Set when this mount ADOPTED an ingest that was already running in main —
     // i.e. the user uploaded, closed the panel, and reopened it. There is no
     // local promise to resume from (the old one's continuation died with the
@@ -2601,46 +2697,315 @@ export function ProfileIntelligenceSettings({
                         const id = profileData.identity;
                         const latestExp = profileData.experience?.[0];
                         const topSkills: string[] = (profileData.skillsFlat ?? []).slice(0, 4);
-                        // Resume summary: cap at 30 words, snap to sentence terminator inside the
-                        // cap. See utils/resumeSummary.ts — pure function, unit-tested.
                         const summary = truncateResumeSummary(id.summary);
-                        return (
-                            <div style={{ padding: '10px 12px', border: '1px solid var(--pi-border)', borderRadius: 'var(--pi-r-md)', background: 'rgba(255,255,255,0.015)', display: 'flex', flexDirection: 'column', gap: 6 }}>
-                                {latestExp && (
-                                    <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--pi-primary)', lineHeight: 1.3 }}>
-                                        {latestExp.role}
-                                        {latestExp.company && <span style={{ fontWeight: 400, color: 'var(--pi-secondary)' }}> · {latestExp.company}</span>}
+                        const ghRepos = profileData.githubRepositories || [];
+
+                        if (isEditingProfile) {
+                            return (
+                                <div style={{ padding: '14px 16px', border: '1px solid var(--pi-accent-border)', borderRadius: 'var(--pi-r-md)', background: 'rgba(255,255,255,0.02)', display: 'flex', flexDirection: 'column', gap: 12 }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                        <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--pi-hero)', display: 'flex', alignItems: 'center', gap: 6 }}>
+                                            <Edit3 size={13} style={{ color: 'var(--pi-accent)' }} /> Manual Corrections
+                                        </div>
+                                        <button
+                                            className="pi-press-soft"
+                                            onClick={() => setIsEditingProfile(false)}
+                                            style={{ background: 'none', border: 'none', color: 'var(--pi-tertiary)', cursor: 'pointer', padding: 4 }}
+                                        >
+                                            <X size={13} />
+                                        </button>
                                     </div>
-                                )}
-                                <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                                    {id.location && (
-                                        <span style={{ fontSize: 11, color: 'var(--pi-tertiary)', display: 'flex', alignItems: 'center', gap: 3 }}>
-                                            <Globe size={10} /> {id.location}
-                                        </span>
+
+                                    {/* Grid for Name, Role, Years */}
+                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                                        <div>
+                                            <label style={{ fontSize: 10, fontWeight: 600, color: 'var(--pi-tertiary)', display: 'block', marginBottom: 4 }}>CANDIDATE NAME</label>
+                                            <input
+                                                className="pi-textarea"
+                                                style={{ border: '1px solid var(--pi-input-border)', borderRadius: 6, padding: '7px 10px', fontSize: 12 }}
+                                                value={editForm.name}
+                                                onChange={e => setEditForm({ ...editForm, name: e.target.value })}
+                                                placeholder="e.g. NISHAKAR T"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label style={{ fontSize: 10, fontWeight: 600, color: 'var(--pi-tertiary)', display: 'block', marginBottom: 4 }}>ROLE / TITLE</label>
+                                            <input
+                                                className="pi-textarea"
+                                                style={{ border: '1px solid var(--pi-input-border)', borderRadius: 6, padding: '7px 10px', fontSize: 12 }}
+                                                value={editForm.role}
+                                                onChange={e => setEditForm({ ...editForm, role: e.target.value })}
+                                                placeholder="e.g. AI/ML Engineer"
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                                        <div>
+                                            <label style={{ fontSize: 10, fontWeight: 600, color: 'var(--pi-accent)', display: 'block', marginBottom: 4 }}>YEARS OF EXPERIENCE</label>
+                                            <input
+                                                type="number"
+                                                step="0.5"
+                                                min="0"
+                                                max="50"
+                                                className="pi-textarea"
+                                                style={{ border: '1px solid var(--pi-accent-border)', borderRadius: 6, padding: '7px 10px', fontSize: 12, background: 'var(--pi-accent-subtle)' }}
+                                                value={editForm.totalExperienceYears}
+                                                onChange={e => setEditForm({ ...editForm, totalExperienceYears: e.target.value })}
+                                                placeholder="e.g. 1.5"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label style={{ fontSize: 10, fontWeight: 600, color: 'var(--pi-tertiary)', display: 'block', marginBottom: 4 }}>LOCATION</label>
+                                            <input
+                                                className="pi-textarea"
+                                                style={{ border: '1px solid var(--pi-input-border)', borderRadius: 6, padding: '7px 10px', fontSize: 12 }}
+                                                value={editForm.location}
+                                                onChange={e => setEditForm({ ...editForm, location: e.target.value })}
+                                                placeholder="e.g. Coimbatore, India"
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                                        <div>
+                                            <label style={{ fontSize: 10, fontWeight: 600, color: 'var(--pi-tertiary)', display: 'block', marginBottom: 4 }}>GITHUB PROFILE / USERNAME</label>
+                                            <input
+                                                className="pi-textarea"
+                                                style={{ border: '1px solid var(--pi-input-border)', borderRadius: 6, padding: '7px 10px', fontSize: 12 }}
+                                                value={editForm.github}
+                                                onChange={e => setEditForm({ ...editForm, github: e.target.value })}
+                                                placeholder="e.g. NISHAKAR06 or https://github.com/NISHAKAR06"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label style={{ fontSize: 10, fontWeight: 600, color: 'var(--pi-tertiary)', display: 'block', marginBottom: 4 }}>LINKEDIN PROFILE</label>
+                                            <input
+                                                className="pi-textarea"
+                                                style={{ border: '1px solid var(--pi-input-border)', borderRadius: 6, padding: '7px 10px', fontSize: 12 }}
+                                                value={editForm.linkedin}
+                                                onChange={e => setEditForm({ ...editForm, linkedin: e.target.value })}
+                                                placeholder="e.g. linkedin.com/in/nishakar314"
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                                        <div>
+                                            <label style={{ fontSize: 10, fontWeight: 600, color: 'var(--pi-tertiary)', display: 'block', marginBottom: 4 }}>EMAIL</label>
+                                            <input
+                                                className="pi-textarea"
+                                                style={{ border: '1px solid var(--pi-input-border)', borderRadius: 6, padding: '7px 10px', fontSize: 12 }}
+                                                value={editForm.email}
+                                                onChange={e => setEditForm({ ...editForm, email: e.target.value })}
+                                                placeholder="e.g. nishakarnishakar06@gmail.com"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label style={{ fontSize: 10, fontWeight: 600, color: 'var(--pi-tertiary)', display: 'block', marginBottom: 4 }}>PHONE</label>
+                                            <input
+                                                className="pi-textarea"
+                                                style={{ border: '1px solid var(--pi-input-border)', borderRadius: 6, padding: '7px 10px', fontSize: 12 }}
+                                                value={editForm.phone}
+                                                onChange={e => setEditForm({ ...editForm, phone: e.target.value })}
+                                                placeholder="e.g. +91 6383628949"
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <div>
+                                        <label style={{ fontSize: 10, fontWeight: 600, color: 'var(--pi-tertiary)', display: 'block', marginBottom: 4 }}>SKILLS (COMMA SEPARATED)</label>
+                                        <input
+                                            className="pi-textarea"
+                                            style={{ border: '1px solid var(--pi-input-border)', borderRadius: 6, padding: '7px 10px', fontSize: 12 }}
+                                            value={editForm.skills}
+                                            onChange={e => setEditForm({ ...editForm, skills: e.target.value })}
+                                            placeholder="Python, SQL, FastAPI, LangGraph, Docker..."
+                                        />
+                                    </div>
+
+                                    <div>
+                                        <label style={{ fontSize: 10, fontWeight: 600, color: 'var(--pi-tertiary)', display: 'block', marginBottom: 4 }}>PROFESSIONAL SUMMARY</label>
+                                        <textarea
+                                            className="pi-textarea"
+                                            rows={3}
+                                            style={{ border: '1px solid var(--pi-input-border)', borderRadius: 6, padding: '7px 10px', fontSize: 12 }}
+                                            value={editForm.summary}
+                                            onChange={e => setEditForm({ ...editForm, summary: e.target.value })}
+                                            placeholder="Brief professional summary..."
+                                        />
+                                    </div>
+
+                                    <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 4 }}>
+                                        <button
+                                            className="pi-pill-btn pi-press"
+                                            onClick={() => setIsEditingProfile(false)}
+                                            style={{ background: 'none' }}
+                                        >
+                                            Cancel
+                                        </button>
+                                        <button
+                                            className="pi-pill-btn pi-press"
+                                            disabled={isSavingProfile}
+                                            onClick={handleSaveProfile}
+                                            style={{
+                                                background: 'var(--pi-accent-subtle)',
+                                                borderColor: 'var(--pi-accent-border)',
+                                                color: 'var(--pi-hero)',
+                                                fontWeight: 600,
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: 6,
+                                            }}
+                                        >
+                                            <Save size={12} />
+                                            {isSavingProfile ? 'Saving…' : 'Save Corrections'}
+                                        </button>
+                                    </div>
+                                </div>
+                            );
+                        }
+
+                        return (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                                <div style={{ padding: '12px 14px', border: '1px solid var(--pi-border)', borderRadius: 'var(--pi-r-md)', background: 'rgba(255,255,255,0.015)', display: 'flex', flexDirection: 'column', gap: 6 }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                        <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--pi-primary)', lineHeight: 1.3 }}>
+                                            {id.name || 'Candidate'} {id.role && <span style={{ fontWeight: 400, color: 'var(--pi-secondary)' }}>· {id.role}</span>}
+                                        </div>
+                                        <button
+                                            className="pi-pill-btn pi-press"
+                                            onClick={openProfileEditor}
+                                            style={{
+                                                fontSize: 11,
+                                                padding: '3px 8px',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: 4,
+                                                color: 'var(--pi-accent)',
+                                                borderColor: 'var(--pi-accent-border)',
+                                                background: 'var(--pi-accent-subtle)',
+                                            }}
+                                        >
+                                            <Edit3 size={11} /> Edit Details
+                                        </button>
+                                    </div>
+
+                                    {latestExp && (
+                                        <div style={{ fontSize: 11, color: 'var(--pi-secondary)' }}>
+                                            {latestExp.role} {latestExp.company && <span>· {latestExp.company}</span>}
+                                        </div>
                                     )}
-                                    {profileStatus.totalExperienceYears != null && profileStatus.totalExperienceYears > 0 && (
-                                        <span style={{ fontSize: 11, color: 'var(--pi-tertiary)' }}>
-                                            {profileStatus.totalExperienceYears}y exp
-                                        </span>
+
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                                        {id.location && (
+                                            <span style={{ fontSize: 11, color: 'var(--pi-tertiary)', display: 'flex', alignItems: 'center', gap: 3 }}>
+                                                <Globe size={10} /> {id.location}
+                                            </span>
+                                        )}
+                                        {profileStatus.totalExperienceYears != null && (
+                                            <span style={{ fontSize: 11, color: 'var(--pi-accent)', fontWeight: 600 }}>
+                                                {profileStatus.totalExperienceYears}y experience
+                                            </span>
+                                        )}
+                                        {id.email && (
+                                            <span style={{ fontSize: 11, color: 'var(--pi-tertiary)' }}>
+                                                {id.email}
+                                            </span>
+                                        )}
+                                    </div>
+
+                                    {summary && (
+                                        <p style={{
+                                            fontSize: 11, color: 'var(--pi-secondary)', margin: 0,
+                                            lineHeight: 1.55,
+                                            minHeight: 'calc(1.55em * 2)',
+                                        }}>{summary}</p>
+                                    )}
+
+                                    {topSkills.length > 0 && (
+                                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 2 }}>
+                                            {topSkills.map(s => (
+                                                <span key={s} style={{ fontSize: 10, padding: '2px 7px', borderRadius: 'var(--pi-r-pill)', background: 'var(--pi-btn-bg)', border: '1px solid var(--pi-btn-border)', color: 'var(--pi-secondary)' }}>{s}</span>
+                                            ))}
+                                        </div>
                                     )}
                                 </div>
-                                {summary && (
-                                    <p style={{
-                                        fontSize: 11, color: 'var(--pi-secondary)', margin: 0,
-                                        lineHeight: 1.55,
-                                        // Lock the summary to ≥3 lines so the card silhouette
-                                        // stays stable. If the summary is longer than 3 lines
-                                        // the card grows — we never chop the text.
-                                        minHeight: `calc(1.55em * 3)`,
-                                    }}>{summary}</p>
-                                )}
-                                {topSkills.length > 0 && (
-                                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 2 }}>
-                                        {topSkills.map(s => (
-                                            <span key={s} style={{ fontSize: 10, padding: '2px 7px', borderRadius: 'var(--pi-r-pill)', background: 'var(--pi-btn-bg)', border: '1px solid var(--pi-btn-border)', color: 'var(--pi-secondary)' }}>{s}</span>
-                                        ))}
+
+                                {/* GitHub Connected Repositories Card */}
+                                <div style={{
+                                    padding: '12px 14px',
+                                    borderRadius: 'var(--pi-r-md)',
+                                    border: '1px solid var(--pi-border)',
+                                    background: 'rgba(255,255,255,0.012)',
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    gap: 8,
+                                }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 600, color: 'var(--pi-primary)' }}>
+                                            <Github size={13} style={{ color: 'var(--pi-accent)' }} />
+                                            GitHub Code Intelligence
+                                        </div>
+                                        <button
+                                            className="pi-pill-btn pi-press"
+                                            disabled={isSyncingGithub}
+                                            onClick={handleSyncGithub}
+                                            style={{
+                                                fontSize: 10,
+                                                padding: '3px 8px',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: 4,
+                                                background: 'var(--pi-btn-bg)',
+                                                cursor: isSyncingGithub ? 'not-allowed' : 'pointer',
+                                            }}
+                                        >
+                                            <RefreshCw size={10} className={isSyncingGithub ? 'animate-spin' : ''} />
+                                            {isSyncingGithub ? 'Syncing…' : ghRepos.length > 0 ? 'Re-sync Code' : 'Connect & Sync'}
+                                        </button>
                                     </div>
-                                )}
+
+                                    <p style={{ margin: 0, fontSize: 11, color: 'var(--pi-tertiary)', lineHeight: 1.4 }}>
+                                        Syncing public repositories indexes code architecture and READMEs so the AI can quote your real code during interviews.
+                                    </p>
+
+                                    {githubSyncMsg && (
+                                        <div style={{ fontSize: 11, color: 'var(--pi-accent)', padding: '4px 8px', borderRadius: 4, background: 'var(--pi-accent-subtle)' }}>
+                                            {githubSyncMsg}
+                                        </div>
+                                    )}
+
+                                    {ghRepos.length > 0 && (
+                                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 2 }}>
+                                            {ghRepos.slice(0, 5).map((repo: any) => (
+                                                <span
+                                                    key={repo.name}
+                                                    title={repo.description || repo.name}
+                                                    style={{
+                                                        fontSize: 10,
+                                                        padding: '2px 7px',
+                                                        borderRadius: 'var(--pi-r-pill)',
+                                                        background: 'var(--pi-accent-subtle)',
+                                                        border: '1px solid var(--pi-accent-border)',
+                                                        color: 'var(--pi-hero)',
+                                                        display: 'inline-flex',
+                                                        alignItems: 'center',
+                                                        gap: 4,
+                                                    }}
+                                                >
+                                                    <Code size={10} style={{ color: 'var(--pi-accent)' }} />
+                                                    {repo.name}
+                                                </span>
+                                            ))}
+                                            {ghRepos.length > 5 && (
+                                                <span style={{ fontSize: 10, color: 'var(--pi-tertiary)', alignSelf: 'center' }}>
+                                                    +{ghRepos.length - 5} more indexed
+                                                </span>
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
                             </div>
                         );
                     })()}
@@ -2920,6 +3285,28 @@ export function ProfileIntelligenceSettings({
                                 <span style={{ color: 'var(--pi-tertiary)' }}> · {roleClause}</span>
                             )}
                         </span>
+                        <button
+                            className="pi-pill-btn pi-press"
+                            onClick={() => {
+                                openProfileEditor();
+                                goToSection('identity');
+                            }}
+                            style={{
+                                fontSize: 11,
+                                padding: '2px 8px',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: 4,
+                                marginLeft: 12,
+                                color: 'var(--pi-accent)',
+                                borderColor: 'var(--pi-accent-border)',
+                                background: 'var(--pi-accent-subtle)',
+                                cursor: 'pointer',
+                            }}
+                            title="Edit years of experience and candidate profile"
+                        >
+                            <Edit3 size={10} /> Edit
+                        </button>
                     </div>
                 ) : roleClause ? (
                     <div className="pi-list-item" style={{ fontSize: 13, color: 'var(--pi-secondary)', marginBottom: 28 }}>

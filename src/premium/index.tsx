@@ -91,5 +91,7 @@ export const MaxUltraUpgradeToaster: React.FC<any> =
 export const ModesSettings: React.FC<any> =
   get(_modesSettings, 'default', NullComponent);
 
+import { RoleInsightPanel as NativeRoleInsightPanel } from '../components/RoleInsightPanel';
+
 export const RoleInsightPanel: React.FC<any> =
-  get(_roleInsight, 'RoleInsightPanel', NullComponent);
+  get(_roleInsight, 'RoleInsightPanel', NativeRoleInsightPanel);

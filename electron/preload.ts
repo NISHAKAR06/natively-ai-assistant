@@ -1011,6 +1011,8 @@ interface ElectronAPI {
   profileSetMode: (enabled: boolean) => Promise<{ success: boolean; error?: string }>;
   profileDelete: () => Promise<{ success: boolean; error?: string }>;
   profileGetProfile: () => Promise<any>;
+  profileUpdateProfile: (updates: any) => Promise<{ success: boolean; profile?: any; error?: string }>;
+  profileSyncGithub: (usernameOrUrl?: string) => Promise<{ success: boolean; count: number; repositories: any[]; error?: string }>;
   profileGetCompanyDossier: () => Promise<any | null>;
   profileSelectFile: () => Promise<{
     success?: boolean;
@@ -2993,6 +2995,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   profileSetMode: (enabled: boolean) => ipcRenderer.invoke('profile:set-mode', enabled),
   profileDelete: () => ipcRenderer.invoke('profile:delete'),
   profileGetProfile: () => ipcRenderer.invoke('profile:get-profile'),
+  profileUpdateProfile: (updates: any) => ipcRenderer.invoke('profile:update-profile', updates),
+  profileSyncGithub: (usernameOrUrl?: string) => ipcRenderer.invoke('profile:sync-github', usernameOrUrl),
   profileGetCompanyDossier: () => ipcRenderer.invoke('profile:get-company-dossier'),
   profileSelectFile: () => ipcRenderer.invoke('profile:select-file'),
 

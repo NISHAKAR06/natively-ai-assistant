@@ -3,6 +3,7 @@ import * as path from 'path';
 import * as os from 'os';
 import { app } from 'electron';
 import { extractSafeDocumentText } from '../SafeDocumentTextExtractor';
+import { RoleInsightService } from './RoleInsightService';
 
 export enum DocType {
   RESUME = 'resume',
@@ -17,6 +18,9 @@ interface ProfileIdentity {
   location?: string;
   summary?: string;
   totalExperienceYears?: number;
+  github?: string;
+  linkedin?: string;
+  website?: string;
 }
 
 interface ProfileExperience {
@@ -46,7 +50,9 @@ interface StructuredResume {
   skillsFlat: string[];
   projects: ProfileProject[];
   education: ProfileEducation[];
-  _extraction_mode: 'heuristic' | 'llm';
+  githubRepositories?: any[];
+  githubSyncStatus?: { syncedAt?: string; repoCount: number };
+  _extraction_mode?: 'heuristic' | 'llm';
 }
 
 interface StructuredJD {
@@ -88,8 +94,10 @@ export class LocalKnowledgeOrchestrator {
 
   private knowledgeMode = true;
   private storagePath: string;
+  private roleInsightService: RoleInsightService;
 
   constructor(private dbOrHandle?: any) {
+    this.roleInsightService = new RoleInsightService(() => this);
     try {
       this.storagePath = path.join(app.getPath('userData'), 'profile_knowledge.json');
     } catch {
@@ -617,11 +625,142 @@ ${text.slice(0, 8000)}`;
       skills: res?.skills || [],
       projects: res?.projects || [],
       education: res?.education || [],
+      githubRepositories: res?.githubRepositories || [],
+      githubSyncStatus: res?.githubSyncStatus || null,
       hasResume: Boolean(res),
       hasActiveJD: Boolean(jd),
       activeResume: res || null,
       activeJD: jd || null,
     };
+  }
+
+  public updateProfileData(updates: any): { success: boolean; profile: any } {
+    if (!this.activeResume) {
+      this.activeResume = {
+        id: 1,
+        file_path: 'Manual Entry',
+        file_name: 'Profile',
+        raw_text: '',
+        structured_data: {
+          identity: {
+            name: updates.identity?.name || 'Candidate',
+            role: updates.identity?.role || 'Software Engineer',
+            totalExperienceYears: updates.identity?.totalExperienceYears || updates.totalExperienceYears || 1,
+          },
+          experience: [],
+          skills: [],
+          skillsFlat: [],
+          projects: [],
+          education: [],
+        },
+      };
+    }
+
+    const cur = this.activeResume.structured_data || ({} as any);
+    if (updates.identity) {
+      cur.identity = { ...cur.identity, ...updates.identity };
+    }
+    if (updates.totalExperienceYears !== undefined && cur.identity) {
+      cur.identity.totalExperienceYears = Number(updates.totalExperienceYears);
+    }
+    if (Array.isArray(updates.experience)) cur.experience = updates.experience;
+    if (Array.isArray(updates.projects)) cur.projects = updates.projects;
+    if (Array.isArray(updates.education)) cur.education = updates.education;
+    if (Array.isArray(updates.skills)) {
+      cur.skills = updates.skills;
+      cur.skillsFlat = updates.skills;
+    }
+    if (Array.isArray(updates.skillsFlat)) cur.skillsFlat = updates.skillsFlat;
+    if (updates.githubRepositories) cur.githubRepositories = updates.githubRepositories;
+
+    this.activeResume.structured_data = cur;
+    this.saveToDisk();
+
+    const summaryText = `${cur.identity?.name} - ${cur.identity?.role}\n${cur.identity?.summary || ''}\nExperience: ${JSON.stringify(cur.experience || [])}\nProjects: ${JSON.stringify(cur.projects || [])}`;
+    this.indexIntoLocalRAG('resume', summaryText, 'Updated Profile');
+
+    console.log('[LocalKnowledgeOrchestrator] Successfully updated profile manually:', cur.identity);
+    return { success: true, profile: this.getProfileData() };
+  }
+
+  public async syncGithubRepositories(usernameOrUrl?: string): Promise<{ success: boolean; count: number; repositories: any[]; error?: string }> {
+    try {
+      let username = (usernameOrUrl || '').trim();
+      if (!username) {
+        username = this.activeResume?.structured_data?.identity?.github || '';
+      }
+      if (!username && this.activeResume?.raw_text) {
+        const ghMatch = this.activeResume.raw_text.match(/github\.com\/([a-zA-Z0-9_-]+)/i);
+        if (ghMatch) username = ghMatch[1];
+      }
+
+      username = username.replace(/^https?:\/\/github\.com\//i, '').replace(/\/.*$/, '').trim();
+      if (!username) {
+        return { success: false, count: 0, repositories: [], error: 'No GitHub username or URL found in resume or input.' };
+      }
+
+      console.log(`[LocalKnowledgeOrchestrator] Syncing GitHub repositories for user: ${username}...`);
+      const res = await fetch(`https://api.github.com/users/${encodeURIComponent(username)}/repos?sort=updated&per_page=30`, {
+        headers: { 'User-Agent': 'natively-ai' },
+      });
+      if (!res.ok) {
+        return { success: false, count: 0, repositories: [], error: `GitHub API returned ${res.status}: ${res.statusText}` };
+      }
+
+      const reposRaw: any = await res.json();
+      if (!Array.isArray(reposRaw)) {
+        return { success: false, count: 0, repositories: [], error: 'Invalid response from GitHub.' };
+      }
+
+      const processedRepos = await Promise.all(
+        reposRaw.slice(0, 15).map(async (r: any) => {
+          let readmeSnippet = '';
+          try {
+            const readmeRes = await fetch(`https://raw.githubusercontent.com/${username}/${r.name}/${r.default_branch || 'main'}/README.md`, {
+              headers: { 'User-Agent': 'natively-ai' },
+            });
+            if (readmeRes.ok) {
+              const text = await readmeRes.text();
+              readmeSnippet = text.slice(0, 800).replace(/<[^>]*>/g, '').trim();
+            }
+          } catch {}
+
+          return {
+            name: r.name,
+            description: r.description || '',
+            language: r.language || '',
+            url: r.html_url || `https://github.com/${username}/${r.name}`,
+            stars: r.stargazers_count || 0,
+            topics: r.topics || [],
+            readmeSnippet,
+          };
+        })
+      );
+
+      if (this.activeResume?.structured_data) {
+        if (!this.activeResume.structured_data.identity) {
+          this.activeResume.structured_data.identity = { name: 'Candidate', role: 'Developer' };
+        }
+        this.activeResume.structured_data.identity.github = `https://github.com/${username}`;
+        this.activeResume.structured_data.githubRepositories = processedRepos;
+        this.activeResume.structured_data.githubSyncStatus = {
+          syncedAt: new Date().toISOString(),
+          repoCount: processedRepos.length,
+        };
+        this.saveToDisk();
+
+        const repoDoc = processedRepos
+          .map((pr: any) => `Repository: ${pr.name} (${pr.language})\nDescription: ${pr.description}\nREADME Overview:\n${pr.readmeSnippet}`)
+          .join('\n\n---\n\n');
+        this.indexIntoLocalRAG('github_code', repoDoc, `GitHub Repositories (${username})`);
+      }
+
+      console.log(`[LocalKnowledgeOrchestrator] Synced ${processedRepos.length} GitHub repositories for ${username}!`);
+      return { success: true, count: processedRepos.length, repositories: processedRepos };
+    } catch (err: any) {
+      console.error('[LocalKnowledgeOrchestrator] Error syncing GitHub repos:', err);
+      return { success: false, count: 0, repositories: [], error: err?.message || String(err) };
+    }
   }
 
   public deleteDocumentsByType(docType: DocType | string): void {
@@ -664,7 +803,7 @@ ${text.slice(0, 8000)}`;
   }
 
   public resetNegotiationSession(): void {}
-  public getRoleInsightService(): any { return null; }
+  public getRoleInsightService(): any { return this.roleInsightService; }
   public getNegotiationScript(): any { return null; }
   public generateNegotiationScriptOnDemand(): Promise<any> { return Promise.resolve(null); }
   public getCoverLetter(): any { return null; }
@@ -689,10 +828,19 @@ ${text.slice(0, 8000)}`;
     const exp = (this.activeResume.structured_data.experience || [])
       .map((e) => `${e.role} at ${e.company} (${e.duration || ''})`)
       .join('\n');
+    const repos = (this.activeResume.structured_data.githubRepositories || [])
+      .slice(0, 4)
+      .map((r: any) => `- ${r.name} (${r.language}): ${r.description}`)
+      .join('\n');
+
+    let relevantFacts = `Candidate Name: ${id.name}\nTitle: ${id.role}\nSkills: ${skills}\nExperience:\n${exp}`;
+    if (repos) {
+      relevantFacts += `\nCandidate GitHub Code Repositories:\n${repos}`;
+    }
 
     return {
-      relevantFacts: `Candidate Name: ${id.name}\nTitle: ${id.role}\nSkills: ${skills}\nExperience:\n${exp}`,
-      sources: [this.activeResume.file_name || 'Resume'],
+      relevantFacts,
+      sources: [this.activeResume.file_name || 'Resume', 'GitHub Repositories'],
     };
   }
 }

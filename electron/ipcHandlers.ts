@@ -17172,6 +17172,32 @@ export function initializeIpcHandlers(appState: AppState): void {
     }
   });
 
+  safeHandle('profile:update-profile', async (_, updates: any) => {
+    try {
+      const orchestrator = appState.getKnowledgeOrchestrator();
+      if (!orchestrator || typeof orchestrator.updateProfileData !== 'function') {
+        return { success: false, error: 'Knowledge orchestrator updateProfileData unavailable' };
+      }
+      return orchestrator.updateProfileData(updates);
+    } catch (error: any) {
+      console.error('[IPC] profile:update-profile error:', error);
+      return { success: false, error: error.message };
+    }
+  });
+
+  safeHandle('profile:sync-github', async (_, usernameOrUrl?: string) => {
+    try {
+      const orchestrator = appState.getKnowledgeOrchestrator();
+      if (!orchestrator || typeof orchestrator.syncGithubRepositories !== 'function') {
+        return { success: false, error: 'Knowledge orchestrator syncGithubRepositories unavailable' };
+      }
+      return await orchestrator.syncGithubRepositories(usernameOrUrl);
+    } catch (error: any) {
+      console.error('[IPC] profile:sync-github error:', error);
+      return { success: false, error: error.message };
+    }
+  });
+
   // Standalone dossier hydration — reads the cached company-research dossier
   // directly off disk for the active JD's company, independent of getProfileData().
   // Used on app startup to rehydrate the Company Intel panel without relying
@@ -17649,12 +17675,6 @@ export function initializeIpcHandlers(appState: AppState): void {
 
   safeHandle('roleInsight:analyse', async (event, options: { jobUrl?: string; skipExternalVerification?: boolean } = {}) => {
     try {
-      if (!isProOrTrialActive()) {
-        return {
-          success: false,
-          error: 'Pro license required. Please activate a license key to use Role Insight.',
-        };
-      }
       const service = getRoleInsightService();
       if (!service) return { success: false, error: 'Role Insight is not available in this build.' };
 
