@@ -127,8 +127,7 @@ type ChatState = 'idle' | 'waiting_for_llm' | 'streaming_response' | 'error';
 // of those timers can even be scheduled), the `await` on this invoke() has
 // no ceiling of its own and can wait forever with the UI showing nothing.
 // This is the backstop: no matter what breaks on the other side of the IPC
-// boundary, the user gets an answer (even if it's "something went wrong")
-const RAG_QUERY_CLIENT_TIMEOUT_MS = 60000;
+const RAG_QUERY_CLIENT_TIMEOUT_MS = 120000;
 
 function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
     return new Promise<T>((resolve, reject) => {
@@ -263,8 +262,10 @@ const GlobalChatOverlay: React.FC<GlobalChatOverlayProps> = ({
             // abortPriorRAGQueriesOfClass only supersedes WITHIN a class, so two
             // different-class queries can genuinely be in flight together.
             const isGlobal = (d: any) => d?.global === true;
+            let hasReceivedAnyChunk = false;
             const tokenCleanup = window.electronAPI?.onRAGStreamChunk((data: { chunk: string }) => {
                 if (!isGlobal(data)) return;
+                hasReceivedAnyChunk = true;
                 setChatState('streaming_response');
                 streamBuffer.appendToken(data.chunk, (content) => {
                     setMessages(prev => prev.map(msg =>
@@ -316,34 +317,45 @@ const GlobalChatOverlay: React.FC<GlobalChatOverlayProps> = ({
             if (doneCleanup) activeCleanups.push(doneCleanup);
             if (errorCleanup) activeCleanups.push(errorCleanup);
 
-            // Use global RAG query. Wrapped in a hard client-side ceiling — see
-            // RAG_QUERY_CLIENT_TIMEOUT_MS above for why this exists: nothing
-            // upstream of this call can guarantee the invoke() ever resolves.
+            // Use global RAG query.
+            // Client-side Time-to-First-Token ceiling: if main deadlocks or Ollama hangs
+            // without emitting a single token for 60s, show error. Once streaming starts,
+            // let it stream to natural completion without false timeouts.
             let result: { fallback?: boolean; success?: boolean; error?: string } | undefined;
-            try {
-                const call = window.electronAPI?.ragQueryGlobal(question);
-                result = call
-                    ? await withTimeout(call, RAG_QUERY_CLIENT_TIMEOUT_MS, 'ragQueryGlobal')
-                    : undefined;
-            } catch (timeoutErr) {
-                console.error('[GlobalChat] ragQueryGlobal client-side timeout:', timeoutErr);
-                // Tear down the RAG listeners we just registered — the main
-                // process may still respond well after this point (its own
-                // internal timeouts run on a longer clock), and a late
-                // rag:stream-chunk/-complete/-error must not land on a message
-                // this function has already abandoned.
-                tokenCleanup?.();
-                doneCleanup?.();
-                errorCleanup?.();
-                activeCleanups = [];
-                setMessages(prev => prev.map(msg =>
-                    msg.id === assistantMessageId
-                        ? { ...msg, content: "This is taking longer than expected. Please try again.", isStreaming: false }
-                        : msg
-                ));
-                setChatState('error');
-                setErrorMessage("The search took too long to respond. Please try again.");
-                return;
+            const call = window.electronAPI?.ragQueryGlobal(question);
+            if (call) {
+                let timeoutHandle: any;
+                const timeoutPromise = new Promise<never>((_, reject) => {
+                    timeoutHandle = setTimeout(() => {
+                        if (!hasReceivedAnyChunk) {
+                            reject(new Error('ragQueryGlobal timed out before first token'));
+                        }
+                    }, 60000);
+                });
+
+                try {
+                    result = await Promise.race([call, timeoutPromise]);
+                } catch (timeoutErr: any) {
+                    if (!hasReceivedAnyChunk) {
+                        console.error('[GlobalChat] ragQueryGlobal timeout before first token:', timeoutErr);
+                        tokenCleanup?.();
+                        doneCleanup?.();
+                        errorCleanup?.();
+                        activeCleanups = [];
+                        setMessages(prev => prev.map(msg =>
+                            msg.id === assistantMessageId
+                                ? { ...msg, content: "This is taking longer than expected. Please try again.", isStreaming: false }
+                                : msg
+                        ));
+                        setChatState('error');
+                        setErrorMessage("The search took too long to respond. Please try again.");
+                        return;
+                    } else {
+                        result = await call;
+                    }
+                } finally {
+                    clearTimeout(timeoutHandle);
+                }
             }
 
             // If electronAPI is unavailable or IPC failed, result will be undefined.
@@ -370,8 +382,10 @@ const GlobalChatOverlay: React.FC<GlobalChatOverlayProps> = ({
                     if (adoptedStreamId === null || id > adoptedStreamId) { adoptedStreamId = id; return true; }
                     return id === adoptedStreamId;
                 };
+                let hasReceivedAnyFallbackToken = false;
                 const oldTokenCleanup = window.electronAPI?.onGeminiStreamToken((token: string, meta?: { streamId?: number }) => {
                     if (!acceptsMeta(meta)) return;
+                    hasReceivedAnyFallbackToken = true;
                     setChatState('streaming_response');
                     streamBuffer.appendToken(token, (content) => {
                         setMessages(prev => prev.map(msg =>
@@ -420,27 +434,41 @@ const GlobalChatOverlay: React.FC<GlobalChatOverlayProps> = ({
                 if (oldDoneCleanup) activeCleanups.push(oldDoneCleanup);
                 if (oldErrorCleanup) activeCleanups.push(oldErrorCleanup);
 
-                // Call standard chat — same client-side ceiling as ragQueryGlobal above.
+                // Call standard chat — Time-to-First-Token ceiling
                 const fallbackCall = window.electronAPI?.streamGeminiChat(question, undefined, undefined, { skipSystemPrompt: false });
                 if (fallbackCall) {
+                    let fallbackTimeoutHandle: any;
+                    const fallbackTimeoutPromise = new Promise<never>((_, reject) => {
+                        fallbackTimeoutHandle = setTimeout(() => {
+                            if (!hasReceivedAnyFallbackToken) {
+                                reject(new Error('streamGeminiChat timed out before first token'));
+                            }
+                        }, 60000);
+                    });
+
                     try {
-                        await withTimeout(fallbackCall, RAG_QUERY_CLIENT_TIMEOUT_MS, 'streamGeminiChat');
+                        await Promise.race([fallbackCall, fallbackTimeoutPromise]);
                     } catch (timeoutErr) {
-                        console.error('[GlobalChat] streamGeminiChat client-side timeout:', timeoutErr);
-                        // Abandoning without cancelling left main streaming into
-                        // listeners the NEXT submit registers.
-                        try { (window.electronAPI as any)?.cancelChatStream?.(); } catch { /* best-effort */ }
-                        oldTokenCleanup?.();
-                        oldDoneCleanup?.();
-                        oldErrorCleanup?.();
-                        activeCleanups = [];
-                        setMessages(prev => prev.map(msg =>
-                            msg.id === assistantMessageId
-                                ? { ...msg, content: "This is taking longer than expected. Please try again.", isStreaming: false }
-                                : msg
-                        ));
-                        setChatState('error');
-                        setErrorMessage("The request took too long to respond. Please try again.");
+                        if (!hasReceivedAnyFallbackToken) {
+                            console.error('[GlobalChat] streamGeminiChat timeout before first token:', timeoutErr);
+                            try { (window.electronAPI as any)?.cancelChatStream?.(); } catch { /* best-effort */ }
+                            oldTokenCleanup?.();
+                            oldDoneCleanup?.();
+                            oldErrorCleanup?.();
+                            activeCleanups = [];
+                            setMessages(prev => prev.map(msg =>
+                                msg.id === assistantMessageId
+                                    ? { ...msg, content: "This is taking longer than expected. Please try again.", isStreaming: false }
+                                    : msg
+                            ));
+                            setChatState('error');
+                            setErrorMessage("The request took too long to respond. Please try again.");
+                            return;
+                        } else {
+                            await fallbackCall;
+                        }
+                    } finally {
+                        clearTimeout(fallbackTimeoutHandle);
                     }
                 }
             }

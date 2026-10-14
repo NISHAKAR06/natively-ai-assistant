@@ -8615,7 +8615,15 @@ let isMultimodal = !!(imagePaths?.length);
   // would leak into the rendered answer. Callers that persist or finalize the
   // buffered result must pass an object and read `outcome.incomplete` after
   // the stream ends; the cap and post-commit-failure branches below set it.
-  public async * streamChatWithGemini(message: string, imagePaths?: string[], context?: string, skipSystemPrompt: boolean = false, abortSignal?: AbortSignal, outcome?: { incomplete?: boolean; reason?: 'output_cap' | 'provider_died_post_commit' }): AsyncGenerator<string, void, unknown> {
+  public async * streamChatWithGemini(
+    message: string,
+    imagePaths?: string[],
+    context?: string,
+    skipSystemPrompt: boolean = false,
+    abortSignal?: AbortSignal,
+    outcome?: { incomplete?: boolean; reason?: 'output_cap' | 'provider_died_post_commit' },
+    systemPromptOverride?: string
+  ): AsyncGenerator<string, void, unknown> {
     console.log(`[LLMHelper] streamChatWithGemini called`, { messageLength: message.length, imageCount: imagePaths?.length ?? 0, hasContext: Boolean(context) });
 
     let isMultimodal = !!(imagePaths?.length);
@@ -8628,7 +8636,7 @@ let isMultimodal = !!(imagePaths?.length);
       }
       if (ollamaAvailable) {
         const localCombined = context ? `CONTEXT:\n${context}\n\nUSER QUESTION:\n${message}` : message;
-        const ollamaScopePrompt = skipSystemPrompt ? undefined : this.resolveLocalSystemPrompt(this.injectLanguageInstruction(HARD_SYSTEM_PROMPT));
+        const ollamaScopePrompt = skipSystemPrompt ? undefined : this.resolveLocalSystemPrompt(this.injectLanguageInstruction(systemPromptOverride || HARD_SYSTEM_PROMPT));
         yield await this.callOllama(localCombined, imagePaths, ollamaScopePrompt);
         return;
       }
@@ -8649,7 +8657,7 @@ let isMultimodal = !!(imagePaths?.length);
       if (vd.action === 'local_only') {
         if (localAvailable) {
           const localCombined = context ? `CONTEXT:\n${context}\n\nUSER QUESTION:\n${message}` : message;
-          const localPrompt = skipSystemPrompt ? undefined : this.resolveLocalSystemPrompt(this.injectLanguageInstruction(HARD_SYSTEM_PROMPT));
+          const localPrompt = skipSystemPrompt ? undefined : this.resolveLocalSystemPrompt(this.injectLanguageInstruction(systemPromptOverride || HARD_SYSTEM_PROMPT));
           yield await this.callOllama(localCombined, imagePaths, localPrompt);
           return;
         }
@@ -8673,8 +8681,11 @@ let isMultimodal = !!(imagePaths?.length);
     };
 
     // For OpenAI/Claude: separate system prompt + user message (proper API pattern)
+    const isProfileContext = context && (context.includes('CANDIDATE') || context.includes('RESUME') || context.includes('PROFILE'));
     const userContent = context
-      ? `CONTEXT:\n${context}\n\nUSER QUESTION:\n${message}`
+      ? (isProfileContext
+          ? `VERIFIED CANDIDATE BACKGROUND & FACTS:\n${context}\n\nQUESTION TO ANSWER AS THE CANDIDATE:\n${message}\n\nPlease generate a natural, confident first-person interview answer synthesizing the background above:`
+          : `CONTEXT:\n${context}\n\nUSER QUESTION:\n${message}`)
       : message;
 
     // Prompt System v2 (flag promptSystemV2): one provider-neutral base prompt
@@ -8687,18 +8698,20 @@ let isMultimodal = !!(imagePaths?.length);
       } catch { return null; }
     })();
 
+    const effectiveSystemPrompt = systemPromptOverride || v2StreamBase;
+
     const combinedMessages = {
-      gemini: buildCombinedMessage(v2StreamBase ?? HARD_SYSTEM_PROMPT),
-      groq: buildCombinedMessage(v2StreamBase ?? GROQ_SYSTEM_PROMPT),
+      gemini: buildCombinedMessage(effectiveSystemPrompt ?? HARD_SYSTEM_PROMPT),
+      groq: buildCombinedMessage(effectiveSystemPrompt ?? GROQ_SYSTEM_PROMPT),
     };
 
     // CACHE: separate system for Groq's prefix cache (used by streamWithGroq below).
-    const groqSystemForCache = skipSystemPrompt ? undefined : this.injectLanguageInstruction(v2StreamBase ?? GROQ_SYSTEM_PROMPT);
+    const groqSystemForCache = skipSystemPrompt ? undefined : this.injectLanguageInstruction(effectiveSystemPrompt ?? GROQ_SYSTEM_PROMPT);
     // CACHE: separate system for Gemini's systemInstruction channel.
-    const geminiSystemForCache = skipSystemPrompt ? undefined : this.injectLanguageInstruction(v2StreamBase ?? HARD_SYSTEM_PROMPT);
+    const geminiSystemForCache = skipSystemPrompt ? undefined : this.injectLanguageInstruction(effectiveSystemPrompt ?? HARD_SYSTEM_PROMPT);
 
     if (this.useOllama) {
-      const ollamaSystemPrompt = this.resolveLocalSystemPrompt(skipSystemPrompt ? TINY_SYSTEM_PROMPT : (v2StreamBase ?? HARD_SYSTEM_PROMPT));
+      const ollamaSystemPrompt = systemPromptOverride || this.resolveLocalSystemPrompt(skipSystemPrompt ? TINY_SYSTEM_PROMPT : (effectiveSystemPrompt ?? HARD_SYSTEM_PROMPT));
       yield* this.streamWithOllama(userContent, undefined, ollamaSystemPrompt, imagePaths, abortSignal);
       return;
     }
@@ -8714,8 +8727,8 @@ let isMultimodal = !!(imagePaths?.length);
     const providers: ProviderAttempt[] = [];
 
     // System prompts for OpenAI/Claude (skipped if skipSystemPrompt)
-    const openaiSystemPrompt = skipSystemPrompt ? undefined : this.injectLanguageInstruction(v2StreamBase ?? OPENAI_SYSTEM_PROMPT);
-    const claudeSystemPrompt = skipSystemPrompt ? undefined : this.injectLanguageInstruction(v2StreamBase ?? CLAUDE_SYSTEM_PROMPT);
+    const openaiSystemPrompt = skipSystemPrompt ? undefined : this.injectLanguageInstruction(effectiveSystemPrompt ?? OPENAI_SYSTEM_PROMPT);
+    const claudeSystemPrompt = skipSystemPrompt ? undefined : this.injectLanguageInstruction(effectiveSystemPrompt ?? CLAUDE_SYSTEM_PROMPT);
 
     // Get auto-discovered text model IDs from ModelVersionManager
     const textOpenAI = this.modelVersionManager.getTextTieredModels(TextModelFamily.OPENAI).tier1;
@@ -8807,7 +8820,7 @@ let isMultimodal = !!(imagePaths?.length);
       if (this.ollamaModel) {
         console.log('[LLMHelper] No cloud provider available in streamChatWithGemini, falling back to Ollama:', this.ollamaModel);
         this.useOllama = true;
-        const ollamaSystemPrompt = this.resolveLocalSystemPrompt(skipSystemPrompt ? TINY_SYSTEM_PROMPT : (v2StreamBase ?? HARD_SYSTEM_PROMPT));
+        const ollamaSystemPrompt = systemPromptOverride || this.resolveLocalSystemPrompt(skipSystemPrompt ? TINY_SYSTEM_PROMPT : (effectiveSystemPrompt ?? HARD_SYSTEM_PROMPT));
         yield* this.streamWithOllama(userContent, undefined, ollamaSystemPrompt, imagePaths, abortSignal);
         return;
       }

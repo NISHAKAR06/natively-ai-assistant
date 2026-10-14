@@ -11,7 +11,7 @@ import type { AppAPIConfig } from './EmbeddingProviderResolver';
 import { EmbeddingPipeline } from './EmbeddingPipeline';
 import { RAGRetriever } from './RAGRetriever';
 import { LiveRAGIndexer } from './LiveRAGIndexer';
-import { buildRAGPrompt, NO_CONTEXT_FALLBACK, NO_GLOBAL_CONTEXT_FALLBACK } from './prompts';
+import { buildRAGPrompt, getRAGSystemPrompt, NO_CONTEXT_FALLBACK, NO_GLOBAL_CONTEXT_FALLBACK } from './prompts';
 import type { ProviderDataScopePolicy } from '../llm/ProviderRouter';
 import { isSpokenSavedLine } from '../intelligence/savedTranscriptOrigin';
 import { buildSummaryTextForSearch } from './summaryTextForSearch';
@@ -398,38 +398,71 @@ export class RAGManager {
             throw new Error('LLM helper not initialized');
         }
 
-        // Retrieve from all meetings
-        const context = await this.retriever.retrieveGlobal(query);
-
-        // Fetch candidate profile & resume knowledge if available
-        let profileContext = '';
-        try {
-            const orch = this.llmHelper.getKnowledgeOrchestrator?.();
-            if (orch?.processQuestion) {
-                const profileResult = await orch.processQuestion(query);
-                if (profileResult?.relevantFacts) {
-                    profileContext = `CANDIDATE RESUME & PROFILE FACTS:\n${profileResult.relevantFacts}`;
+        // Retrieve from all meetings and profile in parallel
+        const [context, profileResult] = await Promise.all([
+            this.retriever.retrieveGlobal(query, { queryEmbedRetryBudgetMs: 1500 }).catch(err => {
+                console.warn('[RAGManager] retrieveGlobal error (non-fatal):', err?.message || err);
+                return { chunks: [], formattedContext: '', totalTokens: 0, meetingIds: [], intent: 'open_question' as const };
+            }),
+            (async () => {
+                try {
+                    const orch = this.llmHelper?.getKnowledgeOrchestrator?.();
+                    if (orch?.getProfileFacts) {
+                        const facts = orch.getProfileFacts();
+                        if (facts) return { relevantFacts: facts };
+                    }
+                    if (orch?.processQuestion) {
+                        return await orch.processQuestion(query);
+                    }
+                } catch (e: any) {
+                    console.warn('[RAGManager] Could not retrieve candidate profile facts:', e?.message || e);
                 }
-            }
-        } catch (e: any) {
-            console.warn('[RAGManager] Could not retrieve candidate profile facts:', e?.message || e);
+                return null;
+            })()
+        ]);
+
+        let profileContext = '';
+        if (profileResult?.relevantFacts) {
+            profileContext = `CANDIDATE RESUME & PROFILE FACTS:\n${profileResult.relevantFacts}`;
         }
 
+        // When candidate profile facts are present, filter out raw unparsed resume OCR chunks
+        // so the model receives structured facts rather than raw page fragments.
+        const cleanMeetingContext = profileResult?.relevantFacts
+            ? context.chunks
+                .filter(c => {
+                    const mid = (c.meetingId || '').toLowerCase();
+                    const txt = c.text || '';
+                    return !mid.includes('resume') && !mid.includes('cv') && !txt.includes('Page 1') && !txt.includes('Software Professional · Key Experience');
+                })
+                .map(c => c.text)
+                .join('\n\n')
+            : context.formattedContext;
+
         let formatted = '';
-        if (context.chunks.length > 0) {
-            formatted = context.formattedContext + (profileContext ? `\n\n${profileContext}` : '');
+        if (profileContext && cleanMeetingContext) {
+            formatted = `${profileContext}\n\nMEETING DISCUSSIONS & NOTES:\n${cleanMeetingContext}`;
         } else if (profileContext) {
             formatted = profileContext;
+        } else if (cleanMeetingContext) {
+            formatted = cleanMeetingContext;
         } else {
             formatted = `(No matching excerpts were found across the user's meetings for this question.)\n${NO_GLOBAL_CONTEXT_FALLBACK}`;
         }
 
-        // Build prompt with intent hint
-        const prompt = buildRAGPrompt(query, formatted, 'global', context.intent);
+        const systemPrompt = getRAGSystemPrompt('global', context.intent);
 
-        // Stream response
+        // Stream response with explicit system prompt and context separation
         const streamOutcome: { incomplete?: boolean } = {};
-        const stream = this.llmHelper.streamChatWithGemini(prompt, undefined, undefined, true, abortSignal, streamOutcome);
+        const stream = this.llmHelper.streamChatWithGemini(
+            query,
+            undefined,
+            formatted,
+            false,
+            abortSignal,
+            streamOutcome,
+            systemPrompt
+        );
 
         const stallMs = this.llmHelper.isUsingOllama?.() ? 60_000 : RAG_STREAM_STALL_MS;
         for await (const chunk of raceGeneratorWithDeadline(stream, stallMs)) {

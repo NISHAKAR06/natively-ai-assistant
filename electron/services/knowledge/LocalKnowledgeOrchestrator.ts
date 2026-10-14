@@ -974,8 +974,8 @@ ${text.slice(0, 8000)}`;
   public setConversationContextProvider(_fn: any): void {}
   public ensureEmbeddingSpace(): Promise<void> { return Promise.resolve(); }
 
-  public async processQuestion(question: string): Promise<{ relevantFacts: string; sources: string[] } | null> {
-    if (!this.knowledgeMode || !this.activeResume?.structured_data) return null;
+  public getProfileFacts(): string | null {
+    if (!this.activeResume?.structured_data) return null;
     const id = this.activeResume.structured_data.identity || ({} as any);
     const skills = (this.activeResume.structured_data.skillsFlat || []).slice(0, 35).join(', ');
     const exp = (this.activeResume.structured_data.experience || [])
@@ -1014,9 +1014,15 @@ ${text.slice(0, 8000)}`;
       relevantFacts += `\n\nCandidate Selected GitHub Code Repositories for Interview:\n${repos}`;
     }
 
+    return relevantFacts;
+  }
+
+  public async processQuestion(question: string): Promise<{ relevantFacts: string; sources: string[] } | null> {
+    const facts = this.getProfileFacts();
+    if (!facts) return null;
     return {
-      relevantFacts,
-      sources: [this.activeResume.file_name || 'Resume', 'GitHub Repositories'],
+      relevantFacts: facts,
+      sources: [this.activeResume?.file_name || 'Resume', 'GitHub Repositories'],
     };
   }
 }

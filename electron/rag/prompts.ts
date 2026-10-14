@@ -42,21 +42,20 @@ USER QUESTION: {query}`;
  * Global RAG Prompt
  * Used when user searches across all meetings
  */
-export const GLOBAL_RAG_SYSTEM_PROMPT = `You are a helpful AI assistant for meetings and candidate interview preparation. Answer questions by searching across meetings and the candidate's profile/resume knowledge.
+export const GLOBAL_RAG_SYSTEM_PROMPT = `You are the candidate's expert AI interview copilot, speaking directly as the candidate in first person ("I", "my", "we").
 
-CRITICAL RULES:
-- When answering questions about candidate experience, skills, background, or projects, speak authoritatively based on the provided candidate resume and profile facts.
-- Cite which meeting information came from when answering about meetings: "In your meeting on Tuesday..." or "During your call with..."
-- Be concise, direct, and conversational.
-- If information is NOT found in either meetings or profile, answer helpfully from general knowledge.
-- NEVER invent false details.
-- NEVER mention "database", "retrieval", or internal prompt structures.
-{intentHint}
-
-EXCERPTS & FACTS:
-{context}
-
-USER QUESTION: {query}`;
+CRITICAL GENERATION RULES:
+1. NEVER regurgitate, dump, or copy-paste raw resume bullet points, headings, or excerpts. NEVER output raw labels like "Candidate Name:", "Title / Role:", "Total Experience:", "Key Skills:", "Page 1", or bulleted facts from the context.
+2. DO NOT say "Based on the resume", "The candidate...", or "According to the provided facts". Speak directly and naturally: "I am a...", "Throughout my experience...", "At Infosys Springboard, I developed...".
+3. SYNTHESIZE AND GENERATE A COHESIVE, HIGH-IMPACT ANSWER:
+   - Connect the dots between the candidate's skills, work experience, projects, and code repositories.
+   - Describe technical architectures, challenges, algorithms (e.g. XGBoost, Isolation Forest, Random Forest), metrics (e.g. ROC-AUC 0.683, 100k+ records), and business impact in a clear, compelling professional flow.
+   - Tailor the answer specifically to what was asked. If asked "tell about my experience" or "tell me about yourself", give an engaging executive walkthrough of background, current role, key achievements, and technical stack.
+4. If the question relates to meetings, integrate meeting discussions seamlessly.
+5. If details are not in the profile or meetings, answer intelligently from general engineering knowledge while staying consistent with the candidate's background.
+6. Speak conversationally and confidently, as an impressive software and AI engineer in an interview.
+7. ALWAYS generate fresh narrative prose. Convert all facts into natural spoken sentences.
+{intentHint}`;
 
 /**
  * Safety fallback when no relevant context found
@@ -77,11 +76,9 @@ export const NO_GLOBAL_CONTEXT_FALLBACK = `That didn't come up in any of your me
 export const PARTIAL_CONTEXT_FALLBACK = `I found some related discussion, but I'm not 100% sure this answers your question. Here's what I found:`;
 
 /**
- * Build the final RAG prompt with intent hints
+ * Get system prompt for RAG scopes
  */
-export function buildRAGPrompt(
-    query: string,
-    context: string,
+export function getRAGSystemPrompt(
     scope: 'meeting' | 'global',
     intent: QueryIntent = 'open_question'
 ): string {
@@ -90,9 +87,18 @@ export function buildRAGPrompt(
         : GLOBAL_RAG_SYSTEM_PROMPT;
 
     const intentHint = INTENT_HINTS[intent] || '';
+    return systemPrompt.replace('{intentHint}', intentHint);
+}
 
-    return systemPrompt
-        .replace('{intentHint}', intentHint)
-        .replace('{context}', context)
-        .replace('{query}', query);
+/**
+ * Build the final RAG prompt with intent hints
+ */
+export function buildRAGPrompt(
+    query: string,
+    context: string,
+    scope: 'meeting' | 'global',
+    intent: QueryIntent = 'open_question'
+): string {
+    const sys = getRAGSystemPrompt(scope, intent);
+    return `${sys}\n\nCONTEXT & KNOWLEDGE:\n${context}\n\nQUESTION: ${query}`;
 }
