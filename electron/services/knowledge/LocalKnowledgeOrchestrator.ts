@@ -976,21 +976,42 @@ ${text.slice(0, 8000)}`;
 
   public async processQuestion(question: string): Promise<{ relevantFacts: string; sources: string[] } | null> {
     if (!this.knowledgeMode || !this.activeResume?.structured_data) return null;
-    const id = this.activeResume.structured_data.identity;
-    const skills = (this.activeResume.structured_data.skillsFlat || []).slice(0, 15).join(', ');
+    const id = this.activeResume.structured_data.identity || ({} as any);
+    const skills = (this.activeResume.structured_data.skillsFlat || []).slice(0, 35).join(', ');
     const exp = (this.activeResume.structured_data.experience || [])
-      .map((e) => `${e.role} at ${e.company} (${e.duration || ''})`)
+      .map((e) => {
+        let entry = `${e.role} at ${e.company} (${e.duration || ''})`;
+        if (e.highlights && e.highlights.length > 0) {
+          entry += `:\n  - ` + e.highlights.join('\n  - ');
+        }
+        return entry;
+      })
+      .join('\n\n');
+    const projects = (this.activeResume.structured_data.projects || [])
+      .map((p) => {
+        let entry = `- ${p.name}: ${p.description || ''}`;
+        if (p.technologies && p.technologies.length > 0) {
+          entry += ` [Tech: ${p.technologies.join(', ')}]`;
+        }
+        if (p.highlights && p.highlights.length > 0) {
+          entry += `\n  * ` + p.highlights.join('\n  * ');
+        }
+        return entry;
+      })
       .join('\n');
     const allRepos = this.activeResume.structured_data.githubRepositories || [];
     const selectedRepos = allRepos.filter((r: any) => r.selected !== false);
     const repos = selectedRepos
-      .slice(0, 6)
+      .slice(0, 10)
       .map((r: any) => `- ${r.name} (${r.language || 'Code'}): ${r.description}`)
       .join('\n');
 
-    let relevantFacts = `Candidate Name: ${id.name}\nTitle: ${id.role}\nSkills: ${skills}\nExperience:\n${exp}`;
+    let relevantFacts = `Candidate Name: ${id.name || 'Candidate'}\nTitle / Role: ${id.role || 'Software Professional'}\nLocation: ${id.location || ''}\nTotal Experience: ${id.totalExperienceYears !== undefined ? id.totalExperienceYears + ' years' : 'N/A'}\nKey Skills: ${skills}\n\nWork Experience:\n${exp}`;
+    if (projects) {
+      relevantFacts += `\n\nKey Projects:\n${projects}`;
+    }
     if (repos) {
-      relevantFacts += `\nCandidate Selected GitHub Code Repositories:\n${repos}`;
+      relevantFacts += `\n\nCandidate Selected GitHub Code Repositories for Interview:\n${repos}`;
     }
 
     return {
@@ -999,3 +1020,4 @@ ${text.slice(0, 8000)}`;
     };
   }
 }
+

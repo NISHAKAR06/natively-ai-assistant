@@ -378,8 +378,12 @@ const MeetingChatOverlay: React.FC<MeetingChatOverlayProps> = ({
             const errorCleanup = window.electronAPI?.onRAGStreamError((data: { error: string }) => {
                 if (!isThisMeeting(data)) return;   // F-122
                 console.error('[MeetingChat] RAG stream error:', data.error);
-                setMessages(prev => prev.filter(msg => msg.id !== assistantMessageId));
-                setErrorMessage("Couldn't get a response. Please try again.");
+                setMessages(prev => prev.map(msg =>
+                    msg.id === assistantMessageId
+                        ? { ...msg, content: data?.error ? `Error: ${data.error}` : "Couldn't get a response. Please try again.", isStreaming: false }
+                        : msg
+                ));
+                setErrorMessage(data?.error || "Couldn't get a response. Please try again.");
                 setChatState('error');
                 streamBuffer.reset();
                 tokenCleanup?.();
@@ -454,8 +458,12 @@ ${contextString}`;
                         if (meta?.source === 'phone-mirror') return;
                         if (typeof meta?.streamId === 'number' && adoptedStreamId !== null && meta.streamId !== adoptedStreamId) return;
                         console.error('[MeetingChat] Gemini stream error (fallback):', error);
-                        setMessages(prev => prev.filter(msg => msg.id !== assistantMessageId));
-                        setErrorMessage("Couldn't get a response. Please check your settings.");
+                        setMessages(prev => prev.map(msg =>
+                            msg.id === assistantMessageId
+                                ? { ...msg, content: error ? `Error: ${error}` : "Couldn't get a response. Please check your settings.", isStreaming: false }
+                                : msg
+                        ));
+                        setErrorMessage(error || "Couldn't get a response. Please check your settings.");
                         setChatState('error');
                         streamBuffer.reset();
                         oldTokenCleanup?.();
@@ -521,8 +529,12 @@ ${contextString}`;
                     if (meta?.source === 'phone-mirror') return;
                     if (typeof meta?.streamId === 'number' && adoptedStreamId !== null && meta.streamId !== adoptedStreamId) return;
                     console.error('[MeetingChat] Gemini stream error:', error);
-                    setMessages(prev => prev.filter(msg => msg.id !== assistantMessageId));
-                    setErrorMessage("Couldn't get a response. Please check your settings.");
+                    setMessages(prev => prev.map(msg =>
+                        msg.id === assistantMessageId
+                            ? { ...msg, content: error ? `Error: ${error}` : "Couldn't get a response. Please check your settings.", isStreaming: false }
+                            : msg
+                    ));
+                    setErrorMessage(error || "Couldn't get a response. Please check your settings.");
                     setChatState('error');
                     streamBuffer.reset();
                     oldTokenCleanup?.();
@@ -542,9 +554,13 @@ ${contextString}`;
                 );
             }
 
-        } catch (error) {
+        } catch (error: any) {
             console.error('[MeetingChat] Error:', error);
-            setMessages(prev => prev.filter(msg => msg.id !== assistantMessageId));
+            setMessages(prev => prev.map(msg =>
+                msg.id === assistantMessageId
+                    ? { ...msg, content: error?.message ? `Error: ${error.message}` : "Something went wrong. Please try again.", isStreaming: false }
+                    : msg
+            ));
             setErrorMessage("Something went wrong. Please try again.");
             setChatState('error');
         } finally {

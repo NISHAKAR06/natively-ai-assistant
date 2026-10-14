@@ -1168,11 +1168,32 @@ export class CredentialsManager {
     public getAiResponseLanguage(): string {
         return this.credentials.aiResponseLanguage || 'auto';
     }
+    public hasAnyCloudKey(): boolean {
+        return Boolean(
+            this.getGeminiApiKey() ||
+            this.getOpenaiApiKey() ||
+            this.getClaudeApiKey() ||
+            this.getGroqApiKey() ||
+            this.getDeepseekApiKey() ||
+            this.getNativelyApiKey() ||
+            (this.getCustomProviders() && this.getCustomProviders().length > 0)
+        );
+    }
+
     public getDefaultModel(): string {
+        if (process.env.USE_OLLAMA === 'true') {
+            if (this.credentials.defaultModel && this.credentials.defaultModel.startsWith('ollama-')) {
+                return this.credentials.defaultModel;
+            }
+            return `ollama-${process.env.OLLAMA_MODEL || 'qwen2.5-coder:7b'}`;
+        }
         if (this.credentials.defaultModel) {
+            if (!this.credentials.defaultModel.startsWith('ollama-') && !this.hasAnyCloudKey()) {
+                return `ollama-${process.env.OLLAMA_MODEL || 'qwen2.5-coder:7b'}`;
+            }
             return this.credentials.defaultModel;
         }
-        if (process.env.USE_OLLAMA === 'true') {
+        if (!this.hasAnyCloudKey()) {
             return `ollama-${process.env.OLLAMA_MODEL || 'qwen2.5-coder:7b'}`;
         }
         // Default to Flash-Lite: ~0.65s first-token vs ~2.3s for full Flash on

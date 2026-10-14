@@ -2949,6 +2949,12 @@ export class LLMHelper {
     }
 
     // Standard Cloud Models
+    if (process.env.USE_OLLAMA === 'true' && !this.apiKey && !this.openaiApiKey && !this.claudeApiKey && !this.groqApiKey) {
+      console.warn(`[LLMHelper] USE_OLLAMA is active and no cloud key is configured; preserving Ollama model (${this.ollamaModel})`);
+      this.useOllama = true;
+      return;
+    }
+
     if (this.useOllama) this.releaseOllamaPin(this.ollamaModel);
     this.useOllama = false;
     // Keep `this.customProvider = null` — only the ACTIVE selection belongs
@@ -8692,8 +8698,8 @@ let isMultimodal = !!(imagePaths?.length);
     const geminiSystemForCache = skipSystemPrompt ? undefined : this.injectLanguageInstruction(v2StreamBase ?? HARD_SYSTEM_PROMPT);
 
     if (this.useOllama) {
-      const response = await this.callOllama(combinedMessages.gemini, imagePaths?.[0]);
-      yield response;
+      const ollamaSystemPrompt = this.resolveLocalSystemPrompt(skipSystemPrompt ? TINY_SYSTEM_PROMPT : (v2StreamBase ?? HARD_SYSTEM_PROMPT));
+      yield* this.streamWithOllama(userContent, undefined, ollamaSystemPrompt, imagePaths, abortSignal);
       return;
     }
 
@@ -8798,6 +8804,13 @@ let isMultimodal = !!(imagePaths?.length);
     }
 
     if (providers.length === 0) {
+      if (this.ollamaModel) {
+        console.log('[LLMHelper] No cloud provider available in streamChatWithGemini, falling back to Ollama:', this.ollamaModel);
+        this.useOllama = true;
+        const ollamaSystemPrompt = this.resolveLocalSystemPrompt(skipSystemPrompt ? TINY_SYSTEM_PROMPT : (v2StreamBase ?? HARD_SYSTEM_PROMPT));
+        yield* this.streamWithOllama(userContent, undefined, ollamaSystemPrompt, imagePaths, abortSignal);
+        return;
+      }
       if (isMultimodal && imagePaths && this.deepseekClient) {
         yield "DeepSeek is configured for text-only requests. Add a vision-capable provider like Gemini, OpenAI, Claude, Groq, or Natively to analyze images.";
         return;
@@ -11895,6 +11908,14 @@ let isMultimodal = !!(imagePaths?.length);
         // this.customProvider and would otherwise fire for the wrong provider.
         this.customProvider = prevCustom;
       }
+    }
+
+    if (!this.useOllama && this.ollamaModel) {
+      console.log('[LLMHelper] No cloud provider available in _streamChatInner, falling back to Ollama:', this.ollamaModel);
+      this.useOllama = true;
+      const ollamaSystemPrompt = this.resolveLocalSystemPrompt(finalSystemPrompt);
+      yield* this.streamWithOllama(contextOsGoverningBlock ? userContent : message, contextOsGoverningBlock ? undefined : combinedContext || undefined, ollamaSystemPrompt, imagePaths, abortSignal);
+      return;
     }
 
     throw new Error(this.noProviderAvailableMessage());

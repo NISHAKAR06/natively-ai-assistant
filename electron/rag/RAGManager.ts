@@ -368,9 +368,10 @@ export class RAGManager {
 
         // Stream response
         const streamOutcome: { incomplete?: boolean } = {};
-        const stream = this.llmHelper.streamChatWithGemini(prompt, undefined, undefined, true, undefined, streamOutcome);
+        const stream = this.llmHelper.streamChatWithGemini(prompt, undefined, undefined, true, abortSignal, streamOutcome);
 
-        for await (const chunk of raceGeneratorWithDeadline(stream, RAG_STREAM_STALL_MS)) {
+        const stallMs = this.llmHelper.isUsingOllama?.() ? 60_000 : RAG_STREAM_STALL_MS;
+        for await (const chunk of raceGeneratorWithDeadline(stream, stallMs)) {
             if (abortSignal?.aborted) break;
             yield chunk;
         }
@@ -400,23 +401,38 @@ export class RAGManager {
         // Retrieve from all meetings
         const context = await this.retriever.retrieveGlobal(query);
 
-        // ALWAYS ANSWER (2026-09-07, owner's direction): an empty global search
-        // used to yield NO_GLOBAL_CONTEXT_FALLBACK with no model call — the
-        // launcher's chat ended in "I couldn't find any discussion about that".
-        // The model now gets an explicit "nothing matched" excerpt and the
-        // prompt's rule to note the gap and still answer from general knowledge.
-        const formatted = context.chunks.length === 0
-            ? `(No matching excerpts were found across the user's meetings for this question.)\n${NO_GLOBAL_CONTEXT_FALLBACK}`
-            : context.formattedContext;
+        // Fetch candidate profile & resume knowledge if available
+        let profileContext = '';
+        try {
+            const orch = this.llmHelper.getKnowledgeOrchestrator?.();
+            if (orch?.processQuestion) {
+                const profileResult = await orch.processQuestion(query);
+                if (profileResult?.relevantFacts) {
+                    profileContext = `CANDIDATE RESUME & PROFILE FACTS:\n${profileResult.relevantFacts}`;
+                }
+            }
+        } catch (e: any) {
+            console.warn('[RAGManager] Could not retrieve candidate profile facts:', e?.message || e);
+        }
+
+        let formatted = '';
+        if (context.chunks.length > 0) {
+            formatted = context.formattedContext + (profileContext ? `\n\n${profileContext}` : '');
+        } else if (profileContext) {
+            formatted = profileContext;
+        } else {
+            formatted = `(No matching excerpts were found across the user's meetings for this question.)\n${NO_GLOBAL_CONTEXT_FALLBACK}`;
+        }
 
         // Build prompt with intent hint
         const prompt = buildRAGPrompt(query, formatted, 'global', context.intent);
 
         // Stream response
         const streamOutcome: { incomplete?: boolean } = {};
-        const stream = this.llmHelper.streamChatWithGemini(prompt, undefined, undefined, true, undefined, streamOutcome);
+        const stream = this.llmHelper.streamChatWithGemini(prompt, undefined, undefined, true, abortSignal, streamOutcome);
 
-        for await (const chunk of raceGeneratorWithDeadline(stream, RAG_STREAM_STALL_MS)) {
+        const stallMs = this.llmHelper.isUsingOllama?.() ? 60_000 : RAG_STREAM_STALL_MS;
+        for await (const chunk of raceGeneratorWithDeadline(stream, stallMs)) {
             if (abortSignal?.aborted) break;
             yield chunk;
         }

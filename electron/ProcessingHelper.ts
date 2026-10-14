@@ -178,7 +178,10 @@ export class ProcessingHelper {
     });
 
     // NEW: Load Default Model Config
-    const defaultModel = credManager.getDefaultModel();
+    let defaultModel = credManager.getDefaultModel();
+    if (process.env.USE_OLLAMA === 'true' && !defaultModel.startsWith('ollama-')) {
+      defaultModel = `ollama-${process.env.OLLAMA_MODEL || 'qwen2.5-coder:7b'}`;
+    }
     // The one-time image test may run from here on (2026-10-01): keys are
     // hydrated above, and main configured the capability store before this
     // helper existed. Before the `if`, so a later selection is tested too.

@@ -128,8 +128,7 @@ type ChatState = 'idle' | 'waiting_for_llm' | 'streaming_response' | 'error';
 // no ceiling of its own and can wait forever with the UI showing nothing.
 // This is the backstop: no matter what breaks on the other side of the IPC
 // boundary, the user gets an answer (even if it's "something went wrong")
-// within a bounded time instead of a silently frozen chat bubble.
-const RAG_QUERY_CLIENT_TIMEOUT_MS = 20000;
+const RAG_QUERY_CLIENT_TIMEOUT_MS = 60000;
 
 function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
     return new Promise<T>((resolve, reject) => {
@@ -300,8 +299,12 @@ const GlobalChatOverlay: React.FC<GlobalChatOverlayProps> = ({
             const errorCleanup = window.electronAPI?.onRAGStreamError((data: { error: string }) => {
                 if (!isGlobal(data)) return;   // F-122
                 console.error('[GlobalChat] RAG stream error:', data.error);
-                setMessages(prev => prev.filter(msg => msg.id !== assistantMessageId));
-                setErrorMessage("Couldn't get a response. Please try again.");
+                setMessages(prev => prev.map(msg =>
+                    msg.id === assistantMessageId
+                        ? { ...msg, content: data?.error ? `Error: ${data.error}` : "Couldn't get a response. Please verify Ollama is running.", isStreaming: false }
+                        : msg
+                ));
+                setErrorMessage(data?.error || "Couldn't get a response. Please try again.");
                 setChatState('error');
                 streamBuffer.reset();
                 tokenCleanup?.();
@@ -400,8 +403,12 @@ const GlobalChatOverlay: React.FC<GlobalChatOverlayProps> = ({
                     if (meta?.source === 'phone-mirror') return;
                     if (typeof meta?.streamId === 'number' && adoptedStreamId !== null && meta.streamId !== adoptedStreamId) return;
                     console.error('[GlobalChat] Gemini stream error:', error);
-                    setMessages(prev => prev.filter(msg => msg.id !== assistantMessageId));
-                    setErrorMessage("Couldn't get a response. Please check your settings.");
+                    setMessages(prev => prev.map(msg =>
+                        msg.id === assistantMessageId
+                            ? { ...msg, content: error ? `Error: ${error}` : "Couldn't get a response. Please check your settings.", isStreaming: false }
+                            : msg
+                    ));
+                    setErrorMessage(error || "Couldn't get a response. Please check your settings.");
                     setChatState('error');
                     streamBuffer.reset();
                     oldTokenCleanup?.();
@@ -438,9 +445,13 @@ const GlobalChatOverlay: React.FC<GlobalChatOverlayProps> = ({
                 }
             }
 
-        } catch (error) {
+        } catch (error: any) {
             console.error('[GlobalChat] Error:', error);
-            setMessages(prev => prev.filter(msg => msg.id !== assistantMessageId));
+            setMessages(prev => prev.map(msg =>
+                msg.id === assistantMessageId
+                    ? { ...msg, content: error?.message ? `Error: ${error.message}` : "Something went wrong. Please try again.", isStreaming: false }
+                    : msg
+            ));
             setErrorMessage("Something went wrong. Please try again.");
             setChatState('error');
         } finally {
