@@ -17198,6 +17198,19 @@ export function initializeIpcHandlers(appState: AppState): void {
     }
   });
 
+  safeHandle('profile:set-selected-repos', async (_, repoNames: string[]) => {
+    try {
+      const orchestrator = appState.getKnowledgeOrchestrator();
+      if (!orchestrator || typeof orchestrator.setSelectedGithubRepos !== 'function') {
+        return { success: false, selectedCount: 0, error: 'Knowledge orchestrator setSelectedGithubRepos unavailable' };
+      }
+      return orchestrator.setSelectedGithubRepos(Array.isArray(repoNames) ? repoNames : []);
+    } catch (error: any) {
+      console.error('[IPC] profile:set-selected-repos error:', error);
+      return { success: false, selectedCount: 0, error: error.message };
+    }
+  });
+
   // Standalone dossier hydration — reads the cached company-research dossier
   // directly off disk for the active JD's company, independent of getProfileData().
   // Used on app startup to rehydrate the Company Intel panel without relying

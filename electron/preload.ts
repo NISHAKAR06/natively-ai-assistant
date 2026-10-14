@@ -1013,6 +1013,7 @@ interface ElectronAPI {
   profileGetProfile: () => Promise<any>;
   profileUpdateProfile: (updates: any) => Promise<{ success: boolean; profile?: any; error?: string }>;
   profileSyncGithub: (usernameOrUrl?: string) => Promise<{ success: boolean; count: number; repositories: any[]; error?: string }>;
+  profileSetSelectedRepos: (repoNames: string[]) => Promise<{ success: boolean; selectedCount: number; error?: string }>;
   profileGetCompanyDossier: () => Promise<any | null>;
   profileSelectFile: () => Promise<{
     success?: boolean;
@@ -2997,6 +2998,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   profileGetProfile: () => ipcRenderer.invoke('profile:get-profile'),
   profileUpdateProfile: (updates: any) => ipcRenderer.invoke('profile:update-profile', updates),
   profileSyncGithub: (usernameOrUrl?: string) => ipcRenderer.invoke('profile:sync-github', usernameOrUrl),
+  profileSetSelectedRepos: (repoNames: string[]) => ipcRenderer.invoke('profile:set-selected-repos', repoNames),
   profileGetCompanyDossier: () => ipcRenderer.invoke('profile:get-company-dossier'),
   profileSelectFile: () => ipcRenderer.invoke('profile:select-file'),
 

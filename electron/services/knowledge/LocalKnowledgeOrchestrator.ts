@@ -46,7 +46,7 @@ interface ProfileEducation {
 interface StructuredResume {
   identity: ProfileIdentity;
   experience: ProfileExperience[];
-  skills: string[];
+  skills: any;
   skillsFlat: string[];
   projects: ProfileProject[];
   education: ProfileEducation[];
@@ -74,6 +74,83 @@ const COMMON_SKILLS = [
   'Scikit-learn', 'Pandas', 'NumPy', 'Machine Learning', 'Deep Learning', 'LLMs', 'RAG',
   'System Design', 'Unit Testing', 'Tailwind', 'Redux', 'Electron'
 ];
+
+export function cleanAndNormalizeSkills(input: any): { categories: Record<string, string[]>; skillsFlat: string[] } {
+  const categories: Record<string, string[]> = {};
+  const flatSet = new Set<string>();
+  let currentCategory = 'Languages';
+
+  let rawList: string[] = [];
+  if (Array.isArray(input)) {
+    rawList = input.map(String);
+  } else if (typeof input === 'string') {
+    rawList = input.split(/[\r\n,]+/);
+  } else if (typeof input === 'object' && input !== null) {
+    for (const [cat, list] of Object.entries(input)) {
+      if (Array.isArray(list)) {
+        for (const item of list) {
+          rawList.push(`${cat}: ${item}`);
+        }
+      }
+    }
+  }
+
+  const KNOWN_CATEGORIES: Record<string, string[]> = {
+    'Languages': ['python', 'sql', 'typescript', 'javascript', 'java', 'c++', 'c#', 'go', 'rust', 'ruby', 'php', 'swift', 'kotlin', 'c', 'html', 'css'],
+    'ML & Deep Learning': ['pytorch', 'scikit-learn', 'tensorflow', 'xgboost', 'random forest', 'isolation forest', 'transformer', 'pandas', 'numpy', 'keras', 'opencv', 'cuda', 'bert', 'llm', 'deep learning', 'machine learning'],
+    'GenAI & LLM Systems': ['rag', 'hybrid retrieval', 'langchain', 'langgraph', 'agentic ai', 'speech-to-text/tts', 'embeddings', 'vector search', 'prompt engineering', 'fastembed', 'groq', 'llamaindex', 'gemini'],
+    'Backend & MLOps': ['fastapi', 'flask', 'django', 'django rest', 'websockets', 'jwt/rbac', 'alembic', 'pytest', 'docker', 'ci/cd', 'kubernetes', 'rest apis', 'microservices', 'git', 'linux', 'node.js', 'express'],
+    'Database': ['postgresql', 'chromadb', 'mongodb', 'redis', 'mysql', 'sqlite', 'vector db', 'elasticsearch'],
+    'Professional': ['problem solving', 'technical communication', 'customer support', 'cross-functional collaboration', 'system design', 'team leadership', 'agile']
+  };
+
+  for (const raw of rawList) {
+    if (!raw || typeof raw !== 'string') continue;
+    let text = raw.trim();
+    if (!text) continue;
+
+    let hasExplicitCat = false;
+    const catMatch = text.match(/^([A-Za-z0-9\s&/_+-]+):\s*(.*)$/);
+    if (catMatch) {
+      currentCategory = catMatch[1].trim();
+      text = catMatch[2].trim();
+      hasExplicitCat = true;
+    }
+
+    const parts = text.split(/,\s*/);
+    for (let part of parts) {
+      part = part.trim()
+        .replace(/^\s*[•\-*]\s*/, '')
+        .replace(/\s*\([^)]*\)\s*$/, '')
+        .trim();
+      if (!part || part.length < 2) continue;
+
+      flatSet.add(part);
+
+      let targetCat = currentCategory;
+      if (!hasExplicitCat || targetCat === 'Languages' || targetCat === 'General') {
+        const lower = part.toLowerCase();
+        for (const [catName, members] of Object.entries(KNOWN_CATEGORIES)) {
+          for (const m of members) {
+            if (lower === m || (m.length > 2 && lower.includes(m)) || (m.length <= 2 && lower === m)) {
+              targetCat = catName;
+              break;
+            }
+          }
+        }
+      }
+
+      if (!categories[targetCat]) {
+        categories[targetCat] = [];
+      }
+      if (!categories[targetCat].includes(part)) {
+        categories[targetCat].push(part);
+      }
+    }
+  }
+
+  return { categories, skillsFlat: Array.from(flatSet) };
+}
 
 export class LocalKnowledgeOrchestrator {
   public activeResume: {
@@ -126,6 +203,40 @@ export class LocalKnowledgeOrchestrator {
             );
             this.activeResume.structured_data = fixed;
             this.saveToDisk();
+          }
+
+          if (this.activeResume?.structured_data) {
+            const sd = this.activeResume.structured_data;
+            let needsSave = false;
+
+            // Auto-clean messy or uncategorized skills
+            const rawSkills = Array.isArray(sd.skills) ? sd.skills : (sd.skillsFlat || []);
+            const hasMessySkills = rawSkills.some((s: string) => typeof s === 'string' && (s.includes(': ') || s.includes('(')));
+            const hasUncategorizedSkills = Array.isArray(sd.skills);
+            if (hasMessySkills || hasUncategorizedSkills) {
+              console.log('[LocalKnowledgeOrchestrator] Cleaning and categorizing cached resume skills...');
+              const cleaned = cleanAndNormalizeSkills(sd.skillsFlat && sd.skillsFlat.length > 0 ? sd.skillsFlat : sd.skills);
+              sd.skills = cleaned.categories;
+              sd.skillsFlat = cleaned.skillsFlat;
+              needsSave = true;
+            }
+
+            // Ensure github repositories have selected flag initialized
+            if (Array.isArray(sd.githubRepositories)) {
+              const resumeLower = (this.activeResume.raw_text || '').toLowerCase().replace(/[-_]/g, '');
+              for (const r of sd.githubRepositories) {
+                if (typeof r.selected !== 'boolean') {
+                  const norm = (r.name || '').toLowerCase().replace(/[-_]/g, '');
+                  const matches = resumeLower.includes(norm) || ['threshold', 'healthforecast', 'intel', 'dealerdesk', 'voicefusion', 'mediquery'].some(k => norm.includes(k));
+                  r.selected = matches || true;
+                  needsSave = true;
+                }
+              }
+            }
+
+            if (needsSave) {
+              this.saveToDisk();
+            }
           }
         }
         if (parsed.activeJD) this.activeJD = parsed.activeJD;
@@ -294,7 +405,9 @@ ${text.slice(0, 8000)}`;
       if (!body?.response) return null;
       const parsed = JSON.parse(body.response);
       if (isResume && parsed.identity?.name && parsed.identity.name.toLowerCase() !== 'page 1') {
-        parsed.skillsFlat = Array.isArray(parsed.skills) ? parsed.skills : [];
+        const cleaned = cleanAndNormalizeSkills(parsed.skills);
+        parsed.skills = cleaned.categories;
+        parsed.skillsFlat = cleaned.skillsFlat;
         parsed._extraction_mode = 'llm';
         return parsed;
       }
@@ -487,30 +600,31 @@ ${text.slice(0, 8000)}`;
       summary = `${name} is a ${role} with strong background in ${skillsList.slice(0, 5).join(', ')}.`;
     }
 
-    return {
-      identity: {
-        name,
-        role,
-        email,
-        phone,
-        location,
-        summary,
-        totalExperienceYears,
-      },
-      experience: expList.length > 0 ? expList : [
-        {
+      const cleaned = cleanAndNormalizeSkills(skillsList);
+      return {
+        identity: {
+          name,
           role,
-          company: 'Industry Experience',
-          duration: `${totalExperienceYears} years`,
-          highlights: lines.filter((l) => l.startsWith('•')).slice(0, 5),
-        }
-      ],
-      skills: skillsList,
-      skillsFlat: skillsList,
-      projects: projList,
-      education: eduList,
-      _extraction_mode: 'heuristic',
-    };
+          email,
+          phone,
+          location,
+          summary,
+          totalExperienceYears,
+        },
+        experience: expList.length > 0 ? expList : [
+          {
+            role,
+            company: 'Industry Experience',
+            duration: `${totalExperienceYears} years`,
+            highlights: lines.filter((l) => l.startsWith('•')).slice(0, 5),
+          }
+        ],
+        skills: cleaned.categories,
+        skillsFlat: cleaned.skillsFlat,
+        projects: projList,
+        education: eduList,
+        _extraction_mode: 'heuristic',
+      };
   }
 
   private parseJdText(text: string, fallbackFileName: string): StructuredJD {
@@ -666,11 +780,12 @@ ${text.slice(0, 8000)}`;
     if (Array.isArray(updates.experience)) cur.experience = updates.experience;
     if (Array.isArray(updates.projects)) cur.projects = updates.projects;
     if (Array.isArray(updates.education)) cur.education = updates.education;
-    if (Array.isArray(updates.skills)) {
-      cur.skills = updates.skills;
-      cur.skillsFlat = updates.skills;
+    if (updates.skills !== undefined || updates.skillsFlat !== undefined) {
+      const rawInput = updates.skills !== undefined ? updates.skills : updates.skillsFlat;
+      const cleaned = cleanAndNormalizeSkills(rawInput);
+      cur.skills = cleaned.categories;
+      cur.skillsFlat = cleaned.skillsFlat;
     }
-    if (Array.isArray(updates.skillsFlat)) cur.skillsFlat = updates.skillsFlat;
     if (updates.githubRepositories) cur.githubRepositories = updates.githubRepositories;
 
     this.activeResume.structured_data = cur;
@@ -681,6 +796,30 @@ ${text.slice(0, 8000)}`;
 
     console.log('[LocalKnowledgeOrchestrator] Successfully updated profile manually:', cur.identity);
     return { success: true, profile: this.getProfileData() };
+  }
+
+  public setSelectedGithubRepos(repoNames: string[]): { success: boolean; selectedCount: number } {
+    if (!this.activeResume?.structured_data?.githubRepositories) {
+      return { success: false, selectedCount: 0 };
+    }
+    const repos = this.activeResume.structured_data.githubRepositories;
+    let count = 0;
+    const nameSet = new Set(repoNames.map((n) => n.toLowerCase().trim()));
+    for (const r of repos) {
+      r.selected = nameSet.has((r.name || '').toLowerCase().trim());
+      if (r.selected) count++;
+    }
+    this.saveToDisk();
+
+    const selectedRepos = repos.filter((r: any) => r.selected);
+    const repoDoc = selectedRepos
+      .map((pr: any) => `Repository: ${pr.name} (${pr.language || 'Code'})\nDescription: ${pr.description}\nREADME Overview:\n${pr.readmeSnippet}`)
+      .join('\n\n---\n\n');
+    const ghUser = this.activeResume.structured_data.identity?.github || 'GitHub';
+    this.indexIntoLocalRAG('github_code', repoDoc, `GitHub Repositories (${ghUser}) - ${count} selected`);
+
+    console.log(`[LocalKnowledgeOrchestrator] Updated selected repositories: ${count} of ${repos.length} selected for interview.`);
+    return { success: true, selectedCount: count };
   }
 
   public async syncGithubRepositories(usernameOrUrl?: string): Promise<{ success: boolean; count: number; repositories: any[]; error?: string }> {
@@ -712,8 +851,13 @@ ${text.slice(0, 8000)}`;
         return { success: false, count: 0, repositories: [], error: 'Invalid response from GitHub.' };
       }
 
+      const existingMap = new Map<string, boolean>();
+      (this.activeResume?.structured_data?.githubRepositories || []).forEach((r: any) => {
+        if (typeof r.selected === 'boolean') existingMap.set(r.name.toLowerCase(), r.selected);
+      });
+
       const processedRepos = await Promise.all(
-        reposRaw.slice(0, 15).map(async (r: any) => {
+        reposRaw.slice(0, 20).map(async (r: any) => {
           let readmeSnippet = '';
           try {
             const readmeRes = await fetch(`https://raw.githubusercontent.com/${username}/${r.name}/${r.default_branch || 'main'}/README.md`, {
@@ -725,6 +869,13 @@ ${text.slice(0, 8000)}`;
             }
           } catch {}
 
+          const normName = (r.name || '').toLowerCase().replace(/[-_]/g, '');
+          const resumeLower = (this.activeResume?.raw_text || '').toLowerCase().replace(/[-_]/g, '');
+          const matchesResume = resumeLower.includes(normName) || ['threshold', 'healthforecast', 'intel', 'dealerdesk', 'voicefusion', 'mediquery'].some(k => normName.includes(k));
+          const isSelected = existingMap.has((r.name || '').toLowerCase())
+            ? existingMap.get(r.name.toLowerCase())!
+            : (matchesResume || true);
+
           return {
             name: r.name,
             description: r.description || '',
@@ -733,6 +884,7 @@ ${text.slice(0, 8000)}`;
             stars: r.stargazers_count || 0,
             topics: r.topics || [],
             readmeSnippet,
+            selected: isSelected,
           };
         })
       );
@@ -749,7 +901,8 @@ ${text.slice(0, 8000)}`;
         };
         this.saveToDisk();
 
-        const repoDoc = processedRepos
+        const selectedRepos = processedRepos.filter((pr: any) => pr.selected !== false);
+        const repoDoc = selectedRepos
           .map((pr: any) => `Repository: ${pr.name} (${pr.language})\nDescription: ${pr.description}\nREADME Overview:\n${pr.readmeSnippet}`)
           .join('\n\n---\n\n');
         this.indexIntoLocalRAG('github_code', repoDoc, `GitHub Repositories (${username})`);
@@ -824,18 +977,20 @@ ${text.slice(0, 8000)}`;
   public async processQuestion(question: string): Promise<{ relevantFacts: string; sources: string[] } | null> {
     if (!this.knowledgeMode || !this.activeResume?.structured_data) return null;
     const id = this.activeResume.structured_data.identity;
-    const skills = (this.activeResume.structured_data.skillsFlat || []).slice(0, 10).join(', ');
+    const skills = (this.activeResume.structured_data.skillsFlat || []).slice(0, 15).join(', ');
     const exp = (this.activeResume.structured_data.experience || [])
       .map((e) => `${e.role} at ${e.company} (${e.duration || ''})`)
       .join('\n');
-    const repos = (this.activeResume.structured_data.githubRepositories || [])
-      .slice(0, 4)
-      .map((r: any) => `- ${r.name} (${r.language}): ${r.description}`)
+    const allRepos = this.activeResume.structured_data.githubRepositories || [];
+    const selectedRepos = allRepos.filter((r: any) => r.selected !== false);
+    const repos = selectedRepos
+      .slice(0, 6)
+      .map((r: any) => `- ${r.name} (${r.language || 'Code'}): ${r.description}`)
       .join('\n');
 
     let relevantFacts = `Candidate Name: ${id.name}\nTitle: ${id.role}\nSkills: ${skills}\nExperience:\n${exp}`;
     if (repos) {
-      relevantFacts += `\nCandidate GitHub Code Repositories:\n${repos}`;
+      relevantFacts += `\nCandidate Selected GitHub Code Repositories:\n${repos}`;
     }
 
     return {

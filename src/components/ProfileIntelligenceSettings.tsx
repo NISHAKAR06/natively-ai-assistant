@@ -2078,7 +2078,19 @@ export function ProfileIntelligenceSettings({
 
     const openProfileEditor = () => {
         const id = profileData?.identity || {};
-        const skillsText = (profileData?.skillsFlat || profileData?.skills || []).join(', ');
+        let flatSkills: string[] = [];
+        if (Array.isArray(profileData?.skillsFlat) && profileData.skillsFlat.length > 0) {
+            flatSkills = profileData.skillsFlat;
+        } else if (Array.isArray(profileData?.skills)) {
+            flatSkills = profileData.skills;
+        } else if (profileData?.skills && typeof profileData.skills === 'object') {
+            flatSkills = Object.values(profileData.skills).flat() as string[];
+        }
+        const cleanList = flatSkills
+            .map(s => String(s).replace(/^[^:]+:\s*/, '').replace(/\s*\([^)]*\)\s*$/, '').trim())
+            .filter(Boolean);
+        const skillsText = cleanList.join(', ');
+
         setEditForm({
             name: id.name || profileStatus.name || '',
             role: id.role || profileStatus.role || '',
@@ -2152,6 +2164,43 @@ export function ProfileIntelligenceSettings({
             setGithubSyncMsg(e?.message || 'GitHub sync failed');
         } finally {
             setIsSyncingGithub(false);
+        }
+    };
+
+    const handleToggleRepo = async (repoName: string) => {
+        const currentRepos = profileData?.githubRepositories || [];
+        const updated = currentRepos.map((r: any) =>
+            r.name === repoName ? { ...r, selected: r.selected === false ? true : false } : r
+        );
+        setProfileData((prev: any) => ({ ...prev, githubRepositories: updated }));
+        const selectedNames = updated.filter((r: any) => r.selected !== false).map((r: any) => r.name);
+        try {
+            await window.electronAPI?.profileSetSelectedRepos?.(selectedNames);
+        } catch (e) {
+            console.error('Failed to update selected repositories:', e);
+        }
+    };
+
+    const handleSelectAllRepos = async () => {
+        const currentRepos = profileData?.githubRepositories || [];
+        const updated = currentRepos.map((r: any) => ({ ...r, selected: true }));
+        setProfileData((prev: any) => ({ ...prev, githubRepositories: updated }));
+        const selectedNames = updated.map((r: any) => r.name);
+        try {
+            await window.electronAPI?.profileSetSelectedRepos?.(selectedNames);
+        } catch (e) {
+            console.error('Failed to select all repositories:', e);
+        }
+    };
+
+    const handleDeselectAllRepos = async () => {
+        const currentRepos = profileData?.githubRepositories || [];
+        const updated = currentRepos.map((r: any) => ({ ...r, selected: false }));
+        setProfileData((prev: any) => ({ ...prev, githubRepositories: updated }));
+        try {
+            await window.electronAPI?.profileSetSelectedRepos?.([]);
+        } catch (e) {
+            console.error('Failed to deselect all repositories:', e);
         }
     };
     // Set when this mount ADOPTED an ingest that was already running in main —
@@ -2696,7 +2745,18 @@ export function ProfileIntelligenceSettings({
                     {profileStatus.hasProfile && !profileUploading && profileData?.identity && (() => {
                         const id = profileData.identity;
                         const latestExp = profileData.experience?.[0];
-                        const topSkills: string[] = (profileData.skillsFlat ?? []).slice(0, 4);
+                        let rawSkills: string[] = [];
+                        if (Array.isArray(profileData.skillsFlat) && profileData.skillsFlat.length > 0) {
+                            rawSkills = profileData.skillsFlat;
+                        } else if (Array.isArray(profileData.skills)) {
+                            rawSkills = profileData.skills;
+                        } else if (profileData.skills && typeof profileData.skills === 'object') {
+                            rawSkills = Object.values(profileData.skills).flat() as string[];
+                        }
+                        const topSkills: string[] = rawSkills
+                            .map(s => String(s).replace(/^[^:]+:\s*/, '').replace(/\s*\([^)]*\)\s*$/, '').trim())
+                            .filter(Boolean)
+                            .slice(0, 5);
                         const summary = truncateResumeSummary(id.summary);
                         const ghRepos = profileData.githubRepositories || [];
 
@@ -2976,35 +3036,160 @@ export function ProfileIntelligenceSettings({
                                         </div>
                                     )}
 
-                                    {ghRepos.length > 0 && (
-                                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 2 }}>
-                                            {ghRepos.slice(0, 5).map((repo: any) => (
-                                                <span
-                                                    key={repo.name}
-                                                    title={repo.description || repo.name}
-                                                    style={{
-                                                        fontSize: 10,
-                                                        padding: '2px 7px',
-                                                        borderRadius: 'var(--pi-r-pill)',
-                                                        background: 'var(--pi-accent-subtle)',
-                                                        border: '1px solid var(--pi-accent-border)',
-                                                        color: 'var(--pi-hero)',
+                                    {ghRepos.length > 0 && (() => {
+                                        const selectedCount = ghRepos.filter((r: any) => r.selected !== false).length;
+                                        return (
+                                            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 4 }}>
+                                                {/* Selection Status & Batch Controls */}
+                                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 6 }}>
+                                                    <span style={{
+                                                        fontSize: 11,
+                                                        fontWeight: 600,
+                                                        color: selectedCount > 0 ? 'var(--pi-accent)' : 'var(--pi-tertiary)',
                                                         display: 'inline-flex',
                                                         alignItems: 'center',
-                                                        gap: 4,
-                                                    }}
-                                                >
-                                                    <Code size={10} style={{ color: 'var(--pi-accent)' }} />
-                                                    {repo.name}
-                                                </span>
-                                            ))}
-                                            {ghRepos.length > 5 && (
-                                                <span style={{ fontSize: 10, color: 'var(--pi-tertiary)', alignSelf: 'center' }}>
-                                                    +{ghRepos.length - 5} more indexed
-                                                </span>
-                                            )}
-                                        </div>
-                                    )}
+                                                        gap: 5,
+                                                    }}>
+                                                        <CheckCircle size={12} style={{ color: selectedCount > 0 ? 'var(--pi-accent)' : 'var(--pi-tertiary)' }} />
+                                                        {selectedCount} of {ghRepos.length} selected for interview
+                                                    </span>
+                                                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                                        <button
+                                                            type="button"
+                                                            className="pi-pill-btn pi-press"
+                                                            onClick={handleSelectAllRepos}
+                                                            style={{ fontSize: 10, padding: '2px 8px', background: 'var(--pi-btn-bg)' }}
+                                                        >
+                                                            Select All
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            className="pi-pill-btn pi-press"
+                                                            onClick={handleDeselectAllRepos}
+                                                            style={{ fontSize: 10, padding: '2px 8px', background: 'var(--pi-btn-bg)' }}
+                                                        >
+                                                            Deselect All
+                                                        </button>
+                                                    </div>
+                                                </div>
+
+                                                {/* Selectable Repositories List */}
+                                                <div style={{
+                                                    display: 'flex',
+                                                    flexDirection: 'column',
+                                                    gap: 6,
+                                                    maxHeight: 230,
+                                                    overflowY: 'auto',
+                                                    paddingRight: 4,
+                                                }}>
+                                                    {ghRepos.map((repo: any) => {
+                                                        const isSelected = repo.selected !== false;
+                                                        return (
+                                                            <div
+                                                                key={repo.name}
+                                                                onClick={() => handleToggleRepo(repo.name)}
+                                                                style={{
+                                                                    display: 'flex',
+                                                                    alignItems: 'center',
+                                                                    justifyContent: 'space-between',
+                                                                    padding: '7px 10px',
+                                                                    borderRadius: 'var(--pi-r-sm)',
+                                                                    border: isSelected ? '1px solid var(--pi-accent-border)' : '1px solid var(--pi-border)',
+                                                                    background: isSelected ? 'var(--pi-accent-subtle)' : 'rgba(255,255,255,0.02)',
+                                                                    cursor: 'pointer',
+                                                                    transition: 'all 0.15s ease',
+                                                                    opacity: isSelected ? 1 : 0.6,
+                                                                }}
+                                                            >
+                                                                <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+                                                                    <div style={{
+                                                                        width: 16,
+                                                                        height: 16,
+                                                                        borderRadius: 4,
+                                                                        border: isSelected ? '1px solid var(--pi-accent)' : '1px solid var(--pi-tertiary)',
+                                                                        background: isSelected ? 'var(--pi-accent)' : 'transparent',
+                                                                        display: 'flex',
+                                                                        alignItems: 'center',
+                                                                        justifyContent: 'center',
+                                                                        flexShrink: 0,
+                                                                    }}>
+                                                                        {isSelected && <Check size={11} color="#000" strokeWidth={3} />}
+                                                                    </div>
+                                                                    <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+                                                                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                                                            <span style={{
+                                                                                fontSize: 12,
+                                                                                fontWeight: 600,
+                                                                                color: isSelected ? 'var(--pi-hero)' : 'var(--pi-secondary)',
+                                                                                whiteSpace: 'nowrap',
+                                                                                overflow: 'hidden',
+                                                                                textOverflow: 'ellipsis',
+                                                                            }}>
+                                                                                {repo.name}
+                                                                            </span>
+                                                                            {repo.language && (
+                                                                                <span style={{
+                                                                                    fontSize: 9,
+                                                                                    padding: '1px 5px',
+                                                                                    borderRadius: 'var(--pi-r-pill)',
+                                                                                    background: 'rgba(255,255,255,0.06)',
+                                                                                    color: 'var(--pi-tertiary)',
+                                                                                    border: '1px solid var(--pi-border)',
+                                                                                }}>
+                                                                                    {repo.language}
+                                                                                </span>
+                                                                            )}
+                                                                            {repo.stars > 0 && (
+                                                                                <span style={{ fontSize: 9, color: 'var(--pi-tertiary)', display: 'inline-flex', alignItems: 'center', gap: 2 }}>
+                                                                                    <Star size={9} /> {repo.stars}
+                                                                                </span>
+                                                                            )}
+                                                                        </div>
+                                                                        {repo.description && (
+                                                                            <span style={{
+                                                                                fontSize: 10,
+                                                                                color: 'var(--pi-tertiary)',
+                                                                                whiteSpace: 'nowrap',
+                                                                                overflow: 'hidden',
+                                                                                textOverflow: 'ellipsis',
+                                                                                maxWidth: 380,
+                                                                            }}>
+                                                                                {repo.description}
+                                                                            </span>
+                                                                        )}
+                                                                    </div>
+                                                                </div>
+                                                                <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+                                                                    {repo.url && (
+                                                                        <button
+                                                                            type="button"
+                                                                            className="pi-press-soft"
+                                                                            title="View on GitHub"
+                                                                            onClick={(e) => {
+                                                                                e.stopPropagation();
+                                                                                openExternal(repo.url);
+                                                                            }}
+                                                                            style={{
+                                                                                background: 'none',
+                                                                                border: 'none',
+                                                                                color: 'var(--pi-tertiary)',
+                                                                                cursor: 'pointer',
+                                                                                padding: 4,
+                                                                                display: 'flex',
+                                                                                alignItems: 'center',
+                                                                            }}
+                                                                        >
+                                                                            <ExternalLink size={12} />
+                                                                        </button>
+                                                                    )}
+                                                                </div>
+                                                            </div>
+                                                        );
+                                                    })}
+                                                </div>
+                                            </div>
+                                        );
+                                    })()}
                                 </div>
                             </div>
                         );
@@ -3203,7 +3388,8 @@ export function ProfileIntelligenceSettings({
         if (skills && !Array.isArray(skills) && typeof skills === 'object') {
             for (const [cat, items] of Object.entries(skills)) {
                 if (!Array.isArray(items) || items.length === 0) continue;
-                const uniqueItems = (items as string[]).filter(s => {
+                const uniqueItems = (items as string[]).map(s => String(s).replace(/^[^:]+:\s*/, '').replace(/\s*\([^)]*\)\s*$/, '').trim()).filter(s => {
+                    if (!s) return false;
                     const key = String(s).toLowerCase();
                     if (seenSkill.has(key)) return false;
                     seenSkill.add(key);
@@ -3211,6 +3397,33 @@ export function ProfileIntelligenceSettings({
                 });
                 if (uniqueItems.length > 0) {
                     skillCategories.push({ name: humanizeCategory(cat), items: uniqueItems });
+                }
+            }
+        } else if (Array.isArray(skills) || skillsFlat.length > 0) {
+            const sourceList = Array.isArray(skills) && skills.length > 0 ? skills : skillsFlat;
+            const parsedCats: Record<string, string[]> = {};
+            let curCat = 'General';
+            for (const raw of sourceList) {
+                let text = String(raw).trim();
+                const m = text.match(/^([A-Za-z0-9\s&/_+-]+):\s*(.*)$/);
+                if (m) {
+                    curCat = m[1].trim();
+                    text = m[2].trim();
+                }
+                const parts = text.split(/,\s*/);
+                for (let p of parts) {
+                    p = p.replace(/^\s*[•\-*]\s*/, '').replace(/\s*\([^)]*\)\s*$/, '').trim();
+                    if (!p || p.length < 2) continue;
+                    const key = p.toLowerCase();
+                    if (seenSkill.has(key)) continue;
+                    seenSkill.add(key);
+                    if (!parsedCats[curCat]) parsedCats[curCat] = [];
+                    parsedCats[curCat].push(p);
+                }
+            }
+            for (const [cat, items] of Object.entries(parsedCats)) {
+                if (items.length > 0) {
+                    skillCategories.push({ name: humanizeCategory(cat), items });
                 }
             }
         }
@@ -3377,9 +3590,10 @@ export function ProfileIntelligenceSettings({
                         ) : (
                             <>
                                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
-                                    {skillsFlat.slice(0, SKILL_CAP).map(s => (
-                                        <span key={s} className="pi-chip">{s}</span>
-                                    ))}
+                                    {skillsFlat.slice(0, SKILL_CAP).map(s => {
+                                        const cleanChip = String(s).replace(/^[^:]+:\s*/, '').replace(/\s*\([^)]*\)\s*$/, '').trim();
+                                        return <span key={s} className="pi-chip">{cleanChip}</span>;
+                                    })}
                                 </div>
                                 {skillsFlat.length > SKILL_CAP && (
                                     <div className="pi-chip-overflow"><span className="pi-chip pi-chip--more">+{skillsFlat.length - SKILL_CAP} more</span></div>
