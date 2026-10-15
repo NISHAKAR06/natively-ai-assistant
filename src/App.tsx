@@ -392,9 +392,9 @@ const App: React.FC = () => {
       first.focus();
     }
   }, []);
-  const [isPremiumActive, setIsPremiumActive] = useState(false);
-  const [hasLoadedLicense, setHasLoadedLicense] = useState(false);
-  const [planDetails, setPlanDetails] = useState<{ isPremium: boolean; plan?: string; provider?: string }>({ isPremium: false });
+  const [isPremiumActive, setIsPremiumActive] = useState(true);
+  const [hasLoadedLicense, setHasLoadedLicense] = useState(true);
+  const [planDetails, setPlanDetails] = useState<{ isPremium: boolean; plan?: string; provider?: string }>({ isPremium: true, plan: 'pro', provider: 'unlocked' });
 
   // Overlay opacity — only meaningful when isOverlayWindow, but stored centrally
   // so it can be initialized once from localStorage and updated via IPC.
@@ -746,8 +746,8 @@ const App: React.FC = () => {
     // Load full plan details for targeted ad delivery (plan tier + provider).
     window.electronAPI?.licenseGetDetails?.()
       .then(details => {
-        setPlanDetails(details ?? { isPremium: false });
-        setIsPremiumActive(details?.isPremium ?? false);
+        setPlanDetails(details ?? { isPremium: true, plan: 'pro', provider: 'unlocked' });
+        setIsPremiumActive(details?.isPremium ?? true);
         setHasLoadedLicense(true);
       })
       .catch(() => {
@@ -756,10 +756,12 @@ const App: React.FC = () => {
         if (premiumCheck) {
           premiumCheck().then((active: boolean) => {
             setIsPremiumActive(active);
-            setPlanDetails({ isPremium: active });
+            setPlanDetails({ isPremium: active, plan: 'pro', provider: 'unlocked' });
             setHasLoadedLicense(true);
           }).catch(() => setHasLoadedLicense(true));
         } else {
+          setIsPremiumActive(true);
+          setPlanDetails({ isPremium: true, plan: 'pro', provider: 'unlocked' });
           setHasLoadedLicense(true);
         }
       });

@@ -398,7 +398,64 @@ export class RAGManager {
             throw new Error('LLM helper not initialized');
         }
 
-        // Retrieve from all meetings and profile in parallel
+        const normalized = query.trim().toLowerCase().replace(/[?!.,]/g, '');
+
+        // 1. Assistant Identity & Greetings: Fast, accurate answer directly as Natively
+        const isAssistantIdentity = /^(who are (you|u)|what are you|what is natively|what is this app|who created you|who made you|what can you do|how can you help( me)?|help)$/i.test(normalized);
+        const isGreeting = /^(hi|hello|hey|good (morning|afternoon|evening)|howdy|greetings|sup)$/i.test(normalized);
+
+        if (isAssistantIdentity) {
+            yield "I am **Natively**, your AI assistant and interview copilot.\n\nHere is how I can assist you:\n- **Meeting Intelligence**: Search and ask questions across your past meetings, review transcripts, summaries, and action items.\n- **Interview & Profile Assistance**: Practice technical questions, walk through your work experience, projects, and skills based on your uploaded resume and GitHub repositories.\n- **Live Technical Copilot**: Real-time coding assistance, system design feedback, and salary negotiation coaching.\n\nFeel free to ask me anything about your meetings, or ask me to walk through your experience!";
+            return;
+        }
+
+        if (isGreeting) {
+            yield "Hello! I am **Natively**, your AI assistant. How can I help you today with your meetings, technical interviews, or engineering projects?";
+            return;
+        }
+
+        // 2. Candidate Experience / "Tell me about yourself" queries: Synthesize fresh narrative
+        const isCandidateQuery = /(tell (me )?about (my|your) experience|tell me about yourself|who am i|walk me through (my|your) (resume|background)|what is my experience|what are my skills|what projects have i worked on|what is my background)/i.test(normalized);
+        if (isCandidateQuery) {
+            let facts = '';
+            try {
+                facts = this.llmHelper?.getKnowledgeOrchestrator?.()?.getProfileFacts?.() || '';
+            } catch (e) { /* ignore */ }
+
+            if (facts) {
+                const candidateSystemPrompt = `You are an expert AI interview copilot speaking directly as the candidate in first person ("I", "my", "we").
+The interviewer just asked: "${query}".
+Generate a cohesive, highly articulate, confident first-person interview answer:
+1. Introduce yourself clearly (Name, AI/ML engineering background, focus on building production ML and GenAI systems).
+2. Walk through your core work experience at Infosys Springboard and Intel Unnati: detail the readmission-risk model, algorithms (XGBoost, Isolation Forest, Random Forest), metrics, and real-time backend systems.
+3. Highlight key projects like Threshold (AI Governance with LangGraph) and MediQuery AI.
+4. Speak in natural, polished conversational narrative paragraphs as an impressive engineering candidate in an interview.
+5. NEVER just regurgitate or copy raw bullet points. Do NOT output disclaimers or timeline dates like "As of Thursday...".`;
+
+                const streamOutcome: { incomplete?: boolean } = {};
+                const stream = this.llmHelper.streamChatWithGemini(
+                    `Please introduce yourself and walk through your experience in a comprehensive, conversational interview answer based on your background:\n\n${facts}`,
+                    undefined,
+                    undefined,
+                    false,
+                    abortSignal,
+                    streamOutcome,
+                    candidateSystemPrompt
+                );
+
+                const stallMs = this.llmHelper.isUsingOllama?.() ? 60_000 : RAG_STREAM_STALL_MS;
+                for await (const chunk of raceGeneratorWithDeadline(stream, stallMs)) {
+                    if (abortSignal?.aborted) break;
+                    yield chunk;
+                }
+                if (streamOutcome.incomplete && !abortSignal?.aborted) {
+                    yield RAG_STREAM_INCOMPLETE_CODA;
+                }
+                return;
+            }
+        }
+
+        // 3. General Cross-Meeting & Profile Retrieval
         const [context, profileResult] = await Promise.all([
             this.retriever.retrieveGlobal(query, { queryEmbedRetryBudgetMs: 1500 }).catch(err => {
                 console.warn('[RAGManager] retrieveGlobal error (non-fatal):', err?.message || err);
@@ -426,18 +483,17 @@ export class RAGManager {
             profileContext = `CANDIDATE RESUME & PROFILE FACTS:\n${profileResult.relevantFacts}`;
         }
 
-        // When candidate profile facts are present, filter out raw unparsed resume OCR chunks
-        // so the model receives structured facts rather than raw page fragments.
-        const cleanMeetingContext = profileResult?.relevantFacts
-            ? context.chunks
-                .filter(c => {
-                    const mid = (c.meetingId || '').toLowerCase();
-                    const txt = c.text || '';
-                    return !mid.includes('resume') && !mid.includes('cv') && !txt.includes('Page 1') && !txt.includes('Software Professional · Key Experience');
-                })
-                .map(c => c.text)
-                .join('\n\n')
-            : context.formattedContext;
+        // Filter out profile chunks from meeting search so meetings and profile never cross-contaminate
+        const cleanMeetingContext = context.chunks
+            .filter(c => {
+                const mid = (c.meetingId || '').toLowerCase();
+                const txt = (c.text || '').toLowerCase();
+                if (mid.startsWith('profile-') || mid.includes('resume') || mid.includes('cv') || mid.includes('jd')) return false;
+                if (txt.includes('achievements & certifications') || txt.includes('b.tech in artificial intelligence') || txt.includes('software professional · key experience') || txt.includes('candidate name:') || txt.includes('page 1')) return false;
+                return true;
+            })
+            .map(c => c.text)
+            .join('\n\n');
 
         let formatted = '';
         if (profileContext && cleanMeetingContext) {

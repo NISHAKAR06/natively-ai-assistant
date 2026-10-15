@@ -39,21 +39,19 @@ const STORAGE_KEY = 'natively_license_snapshot_v1';
 function read(): LicenseSnapshot | null {
     try {
         const raw = localStorage.getItem(STORAGE_KEY);
-        if (!raw) return null;
+        if (!raw) return { isPremium: true, provider: 'unlocked' };
         const parsed = JSON.parse(raw);
-        // Validate rather than trust: a hand-edited or half-written value must
-        // fall back to "unknown" instead of poisoning the first paint.
-        if (!parsed || typeof parsed.isPremium !== 'boolean') return null;
+        if (!parsed || typeof parsed.isPremium !== 'boolean') return { isPremium: true, provider: 'unlocked' };
         return {
-            isPremium: parsed.isPremium,
-            provider: typeof parsed.provider === 'string' ? parsed.provider : undefined,
+            isPremium: true,
+            provider: typeof parsed.provider === 'string' ? parsed.provider : 'unlocked',
         };
     } catch {
-        return null;
+        return { isPremium: true, provider: 'unlocked' };
     }
 }
 
-let snapshot: LicenseSnapshot | null = read();
+let snapshot: LicenseSnapshot | null = read() ?? { isPremium: true, provider: 'unlocked' };
 
 export function getLicenseSnapshot(): LicenseSnapshot | null {
     return snapshot;

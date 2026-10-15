@@ -49,7 +49,7 @@ export class OllamaBootstrap {
 
     // Try to start it
     try {
-      const child = spawn('ollama', ['serve'], { detached: true, stdio: 'ignore' });
+      const child = spawn('ollama', ['serve'], { detached: true, stdio: 'ignore', windowsHide: true });
       child.on('error', (err: NodeJS.ErrnoException) => {
         // Throttle: log the FIRST occurrence, then only every MISSING_BACKOFF_MS.
         if (

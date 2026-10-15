@@ -79,8 +79,10 @@ export const JDAwarenessToaster: React.FC<any> =
 export const RemoteCampaignToaster: React.FC<any> =
   get(_remoteCampaignToaster, 'RemoteCampaignToaster', NullComponent);
 
+import { NegotiationCoachingCard as NativeNegotiationCoachingCard } from '../components/NegotiationCoachingCard';
+
 export const NegotiationCoachingCard: React.FC<any> =
-  get(_negotiationCard, 'NegotiationCoachingCard', NullComponent);
+  get(_negotiationCard, 'NegotiationCoachingCard', NativeNegotiationCoachingCard);
 
 export const NativelyApiPromoToaster: React.FC<any> =
   get(_nativelyApiPromo, 'NativelyApiPromoToaster', NullComponent);
@@ -95,3 +97,4 @@ import { RoleInsightPanel as NativeRoleInsightPanel } from '../components/RoleIn
 
 export const RoleInsightPanel: React.FC<any> =
   get(_roleInsight, 'RoleInsightPanel', NativeRoleInsightPanel);
+

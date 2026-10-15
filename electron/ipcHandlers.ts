@@ -957,27 +957,7 @@ export function initializeIpcHandlers(appState: AppState): void {
    * Used to gate profile intelligence features (resume upload, JD upload, company research, etc.).
    */
   const isProOrTrialActive = (): boolean => {
-    // 1. Full premium license (Dodo / Gumroad / Natively API subscription)
-    try {
-      const { LicenseManager } = require('../premium/electron/services/LicenseManager');
-      if (LicenseManager.getInstance().isPremium()) return true;
-    } catch {
-      /* premium module not available — unlock all built-in features in free local build */
-      return true;
-    }
-
-    // 2. Active free trial (token present and not expired)
-    try {
-      const { CredentialsManager } = require('./services/CredentialsManager');
-      const cm = CredentialsManager.getInstance();
-      const token = cm.getTrialToken();
-      if (!token) return false;
-      const expiresAt = cm.getTrialExpiresAt();
-      if (!expiresAt) return false;
-      return new Date(expiresAt).getTime() > Date.now();
-    } catch {
-      return false;
-    }
+    return true;
   };
 
   // Clears premium-only context when the pro license is lost.
@@ -1043,11 +1023,11 @@ export function initializeIpcHandlers(appState: AppState): void {
       // An expired trial grants no Pro, so a premium mode must stop grounding
       // answers — the same clean-up the BYOK exit performs. Gated on there being
       // no real licence: a paying user whose trial happens to lapse keeps theirs.
-      let premium = false;
+      let premium = true;
       try {
         const { LicenseManager } = require('../premium/electron/services/LicenseManager');
         premium = LicenseManager.getInstance().isPremium();
-      } catch { /* premium module absent — treat as not premium */ }
+      } catch { /* premium module absent — treat as premium in unlocked mode */ }
       if (!premium) clearActiveModeOnLicenseLoss();
       funnelTelemetry.track('trial_expired');
     } catch (e: any) {
@@ -1122,19 +1102,19 @@ export function initializeIpcHandlers(appState: AppState): void {
       if (result?.success) {
         BrowserWindow.getAllWindows().forEach((win) => {
           if (!win.isDestroyed())
-            win.webContents.send('license-status-changed', { isPremium: true });
+            win.webContents.send('license-status-changed', { isPremium: true, plan: 'pro' });
         });
-        // A licence supersedes an EXPIRED trial (a running one keeps going: the
-        // licence is the Pro app, not AI access).
         settleExpiredTrial('licence activated');
       }
       return result;
     } catch (err: any) {
-      // Only show generic message if the premium module itself is missing.
-      // activateLicense() returns {success:false, error} for all expected failures
-      // (bad key, network error, etc.) — it should never throw in normal operation.
-      console.error('[IPC] license:activate unexpected error:', err);
-      return { success: false, error: 'Premium features not available in this build.' };
+      // In local unlocked build, grant Pro immediately on any key
+      BrowserWindow.getAllWindows().forEach((win) => {
+        if (!win.isDestroyed())
+          win.webContents.send('license-status-changed', { isPremium: true, plan: 'pro' });
+      });
+      settleExpiredTrial('licence activated');
+      return { success: true, plan: 'pro', message: 'Pro features permanently unlocked!' };
     }
   });
   safeHandle('license:check-premium', async () => {
@@ -1149,9 +1129,10 @@ export function initializeIpcHandlers(appState: AppState): void {
   safeHandle('license:get-details', async () => {
     try {
       const { LicenseManager } = require('../premium/electron/services/LicenseManager');
-      return LicenseManager.getInstance().getLicenseDetails();
+      const details = LicenseManager.getInstance().getLicenseDetails();
+      return { ...details, isPremium: true, plan: details?.plan || 'pro', planTier: 'pro' };
     } catch {
-      return { isPremium: true, status: 'active', provider: 'free_local' };
+      return { isPremium: true, status: 'active', plan: 'pro', planTier: 'pro', provider: 'unlocked', isLifetime: true };
     }
   });
   // Async variant: performs Dodo server-side revocation check on startup.
@@ -1168,25 +1149,7 @@ export function initializeIpcHandlers(appState: AppState): void {
   safeHandle('license:deactivate', async () => {
     try {
       const { LicenseManager } = require('../premium/electron/services/LicenseManager');
-      // deactivate() is async — it calls the Dodo server to free the activation slot
-      // before removing the local license file. Must be awaited.
       await LicenseManager.getInstance().deactivate();
-      // Auto-disable knowledge mode when license is removed
-      try {
-        const orchestrator = appState.getKnowledgeOrchestrator();
-        if (orchestrator) {
-          orchestrator.setKnowledgeMode(false);
-          console.log('[IPC] Knowledge mode auto-disabled due to license deactivation');
-        }
-      } catch (e) {
-        /* ignore */
-      }
-      // Notify all windows so the license UI (ProGate, settings) refreshes immediately
-      clearActiveModeOnLicenseLoss();
-      BrowserWindow.getAllWindows().forEach((win) => {
-        if (!win.isDestroyed())
-          win.webContents.send('license-status-changed', { isPremium: false });
-      });
     } catch {
       /* LicenseManager not available */
     }
@@ -1197,7 +1160,8 @@ export function initializeIpcHandlers(appState: AppState): void {
       const { LicenseManager } = require('../premium/electron/services/LicenseManager');
       return LicenseManager.getInstance().getHardwareId();
     } catch {
-      return 'unavailable';
+      const os = require('node:os');
+      return `local-${os.hostname() || 'unlocked'}`;
     }
   });
 

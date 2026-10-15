@@ -13321,6 +13321,14 @@ let isMultimodal = !!(imagePaths?.length);
         }
       }
     } catch (e: any) {
+      if (modelOverride && this.ollamaVisionModel === modelOverride) {
+        this.ollamaVisionModel = null;
+      }
+      const errMsg = e?.message || '';
+      if (errMsg.includes('402') || errMsg.includes('Free plan') || errMsg.includes('upgrade')) {
+        this.ollamaVisionCache.set(ollamaModel, false);
+        this.ollamaVisionModel = null;
+      }
       if (strictErrors) throw e;
       console.error('[LLMHelper] Ollama streaming failed:', e?.message || e);
       yield `Error: Failed to stream from Ollama (${e?.message || 'unknown'}).`;
@@ -14169,7 +14177,8 @@ let isMultimodal = !!(imagePaths?.length);
    */
   private async resolveOllamaVisionModelForChain(budgetMs: number = OLLAMA_VISION_CHAIN_PROBE_BUDGET_MS): Promise<string | null> {
     if (!this.useOllama) return null;
-    if (this.ollamaVisionModel) return this.ollamaVisionModel;
+    if (this.ollamaVisionModel && this.ollamaVisionCache.get(this.ollamaVisionModel) !== false) return this.ollamaVisionModel;
+    if (this.ollamaVisionModel && this.ollamaVisionCache.get(this.ollamaVisionModel) === false) this.ollamaVisionModel = null;
     if (Date.now() < this.ollamaVisionNegativeUntil) return null;
 
     let timer: ReturnType<typeof setTimeout> | undefined;

@@ -667,7 +667,7 @@ ${text.slice(0, 8000)}`;
     };
   }
 
-  private indexIntoLocalRAG(kind: 'resume' | 'jd', content: string, fileName: string): void {
+  private indexIntoLocalRAG(kind: 'resume' | 'jd' | 'github_code', content: string, fileName: string): void {
     try {
       const { DatabaseManager } = require('../../db/DatabaseManager');
       const db = DatabaseManager.getInstance().getDb();

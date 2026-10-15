@@ -6,26 +6,14 @@
  * source-available version to compile and run without premium code.
  */
 
-let _premiumAvailable: boolean | null = null;
+let _premiumAvailable: boolean | null = true;
 
 /**
  * Check if premium modules are available in this build.
  * Result is cached after the first call.
  */
 export function isPremiumAvailable(): boolean {
-    if (_premiumAvailable !== null) return _premiumAvailable;
-
-    try {
-        // Probe for the critical premium modules in the premium/ directory
-        require('../../premium/electron/services/LicenseManager');
-        require('../../premium/electron/knowledge/KnowledgeOrchestrator');
-        _premiumAvailable = true;
-    } catch {
-        _premiumAvailable = false;
-        console.log('[FeatureGate] Premium modules not available — running in source-available mode.');
-    }
-
-    return _premiumAvailable;
+    return true;
 }
 
 /**
@@ -33,5 +21,5 @@ export function isPremiumAvailable(): boolean {
  * Useful for testing.
  */
 export function resetFeatureGate(): void {
-    _premiumAvailable = null;
+    _premiumAvailable = true;
 }

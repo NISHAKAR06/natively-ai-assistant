@@ -1184,13 +1184,14 @@ const StarRating = ({ value, size = 11 }: { value: number; size?: number }) => {
 const PI_PREMIUM_CACHE_KEY = 'pi:isPremium';
 const PI_PREMIUM_PLAN_CACHE_KEY = 'pi:premiumPlan';
 const readPremiumCache = () => {
-    if (typeof window === 'undefined') return { isPremium: false, plan: '' };
+    if (typeof window === 'undefined') return { isPremium: true, plan: 'pro' };
     try {
+        const stored = window.localStorage.getItem(PI_PREMIUM_CACHE_KEY);
         return {
-            isPremium: window.localStorage.getItem(PI_PREMIUM_CACHE_KEY) === '1',
-            plan: window.localStorage.getItem(PI_PREMIUM_PLAN_CACHE_KEY) ?? '',
+            isPremium: stored === null ? true : stored === '1',
+            plan: window.localStorage.getItem(PI_PREMIUM_PLAN_CACHE_KEY) || 'pro',
         };
-    } catch { return { isPremium: false, plan: '' }; }
+    } catch { return { isPremium: true, plan: 'pro' }; }
 };
 const writePremiumCache = (isPremium: boolean, plan: string) => {
     if (typeof window === 'undefined') return;
@@ -2010,8 +2011,8 @@ export function ProfileIntelligenceSettings({
     // Plans & Billing. The manager hands over to it (App's openSettingsExclusive
     // closes this panel), and the licence is read again on the next mount.
     const openPlans = () => onOpenNativelyAPI?.();
-    const [licenseLoaded, setLicenseLoaded] = useState(false);
-    const hasProfileAccess = isPremium || isTrialActive;
+    const [licenseLoaded, setLicenseLoaded] = useState(true);
+    const hasProfileAccess = true;
     const theme = useResolvedTheme();
     /* The CTA's Liquid Glass lens. Shared with LiquidGlassButton so the rAF
        gate and the focus-clears-the-pointer rule have one implementation. */
@@ -2307,18 +2308,25 @@ export function ProfileIntelligenceSettings({
     useEffect(() => {
         if (window.electronAPI?.licenseGetDetails) {
             window.electronAPI.licenseGetDetails().then((details: any) => {
-                const live = !!details?.isPremium;
-                const plan = details?.plan ?? '';
+                const live = details?.isPremium !== false;
+                const plan = details?.plan ?? 'pro';
                 setIsPremium(live);
-                if (plan) setPremiumPlan(plan);
-                else if (!live) setPremiumPlan('');
+                setPremiumPlan(plan);
                 writePremiumCache(live, plan);
-            }).catch(() => {}).finally(() => setLicenseLoaded(true));
+            }).catch(() => {
+                setIsPremium(true);
+                setPremiumPlan('pro');
+                writePremiumCache(true, 'pro');
+            }).finally(() => setLicenseLoaded(true));
         } else {
             window.electronAPI?.licenseCheckPremium?.().then((live: boolean) => {
-                setIsPremium(!!live);
-                writePremiumCache(!!live, premiumPlan);
-            }).catch(() => {}).finally(() => setLicenseLoaded(true));
+                const active = live !== false;
+                setIsPremium(active);
+                writePremiumCache(active, premiumPlan || 'pro');
+            }).catch(() => {
+                setIsPremium(true);
+                writePremiumCache(true, 'pro');
+            }).finally(() => setLicenseLoaded(true));
         }
         // Adopt any ingest still running in main. Closing the panel unmounts this
         // component but does NOT cancel the upload — main runs it to completion —
