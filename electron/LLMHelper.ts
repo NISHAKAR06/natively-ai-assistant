@@ -3561,6 +3561,26 @@ export class LLMHelper {
     return this.useOllama && await this.checkOllamaAvailable(needsVision);
   }
 
+  private selectPreferredOllamaModel(availableModels: string[]): string {
+    if (availableModels.length === 0) return '';
+    const rank = (m: string) => {
+      const lower = m.toLowerCase();
+      // 1st preference: qwen 2.5 7b (general high-accuracy multilingual)
+      if (lower === 'qwen2.5:7b' || lower === 'qwen2.5-7b') return 100;
+      // 2nd preference: qwen 2.5 coder 7b
+      if (lower.startsWith('qwen2.5-coder:7b')) return 95;
+      if (lower.startsWith('qwen2.5:14b') || lower.startsWith('qwen2.5:8b')) return 90;
+      if (lower.startsWith('qwen2.5:7b')) return 88;
+      if (lower.startsWith('qwen2.5-coder')) return 85;
+      if (lower.startsWith('qwen2.5')) return 80;
+      if (lower.startsWith('llama3.1:8b') || lower.startsWith('llama3.1')) return 75;
+      if (lower.startsWith('llama3')) return 60;
+      if (lower.startsWith('mistral')) return 50;
+      return 10;
+    };
+    return [...availableModels].sort((a, b) => rank(b) - rank(a))[0];
+  }
+
   /**
    * One probe of the local runtime, with NO side effects.
    *
@@ -3586,7 +3606,7 @@ export class LLMHelper {
       if (availableModels.length === 0) return { ok: false };
       const model = (this.ollamaModel && availableModels.includes(this.ollamaModel))
         ? this.ollamaModel
-        : availableModels[0];
+        : this.selectPreferredOllamaModel(availableModels);
       // Is the daemon on this machine or the local network? OLLAMA_URL can point
       // anywhere; "local" is earned from the host, as for a custom or cURL endpoint.
       const daemonIsLocal = customProviderIsLocal({ curlCommand: this.ollamaUrl });
@@ -3739,8 +3759,8 @@ export class LLMHelper {
       }
 
       if (!this.ollamaModel || !availableModels.includes(this.ollamaModel)) {
-        this.ollamaModel = availableModels[0]
-        console.log(`[LLMHelper] Auto-selected Ollama model: ${this.ollamaModel}`)
+        this.ollamaModel = this.selectPreferredOllamaModel(availableModels);
+        console.log(`[LLMHelper] Auto-selected Ollama model: ${this.ollamaModel}`);
       }
 
       // /api/show validates the model is loadable without spending tokens.
@@ -3763,8 +3783,8 @@ export class LLMHelper {
       try {
         const models = await this.getOllamaGenerationModels()
         if (models.length > 0) {
-          this.ollamaModel = models[0]
-          console.log(`[LLMHelper] Fallback to first installed model: ${this.ollamaModel}`)
+          this.ollamaModel = this.selectPreferredOllamaModel(models);
+          console.log(`[LLMHelper] Fallback to preferred installed model: ${this.ollamaModel}`);
         } else {
           this.notifyRendererOllamaError(`Ollama is reachable but no models are installed.`);
         }
