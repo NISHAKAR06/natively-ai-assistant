@@ -2889,7 +2889,10 @@ export class IntelligenceEngine extends EventEmitter {
                     // through the existing negotiation-exclusion, untouched.
                     const isNegotiationButActuallyJdFact = extracted.questionType === 'negotiation'
                         && isJdFactualLookupNotNegotiationAdvice(extracted.latestQuestion || '');
-                    const groundable = extracted.detectedSpeaker === 'interviewer'
+                    const isSocialOrPleasantry = extracted.questionType === 'social'
+                        || /\b(how('s| is) (your day|everything|it going|things)|how are you doing|nice to meet you|thank you for joining)\b/i.test(extracted.latestQuestion || '');
+                    const groundable = !isSocialOrPleasantry
+                        && extracted.detectedSpeaker === 'interviewer'
                         && extracted.confidence >= 0.6
                         && (extracted.questionType === 'identity'
                             || extracted.questionType === 'profile_detail'

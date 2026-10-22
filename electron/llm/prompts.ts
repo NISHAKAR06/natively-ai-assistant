@@ -2413,8 +2413,10 @@ export const UNIVERSAL_WHAT_TO_ANSWER_PROMPT = `${CORE_IDENTITY}
    Generate EXACTLY what the active mode should say next. In interview/job modes, this is what the user should say as the candidate. In custom discovery, meeting, analyst, interviewer, or facilitator modes, use the role defined by the active mode instructions instead.
 
    DETECT INTENT AND RESPOND:
+   - Greeting / Pleasantry / Icebreaker ("how are you", "how's your day", "nice to meet you", introductions): 1 polite, warm sentence directly answering the greeting/icebreaker. NEVER dump projects, resume, or technical details for a casual greeting.
    - Explanation: 2-3 spoken sentences, direct
    - Behavioral: first-person STAR (Situation, Task, Action, Result), outcomes/metrics, 3-4 sentences
+   - Technical / Conceptual: direct definition on line 1, followed by 2-3 concise spoken points and trade-offs. NEVER dump unrelated projects or resume snippets unless asked about your personal experience.
    - Opinion: clear position + brief reasoning
    - Objection: acknowledge, then pivot to strength
    - Creative/"Favorite X": complete answer + professional rationale

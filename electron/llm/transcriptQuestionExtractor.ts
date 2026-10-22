@@ -36,6 +36,7 @@ export type ExtractedQuestionType =
     | 'behavioral'      // "tell me about a time" / STAR
     | 'technical'       // explain / implement / how does X work
     | 'follow_up'       // "can you explain that in more detail" — depends on prior turn
+    | 'social'          // greetings / pleasantries / "how's your day going"
     | 'general';        // anything else meaningful
 
 export interface ExtractedQuestion {
@@ -304,6 +305,11 @@ function classifyType(q: string): ExtractedQuestionType {
     // Technical / conceptual
     if (/\b(implement|write (code|a function|a program)|algorithm|data structure|system design|how does .* work|explain (how|the)|difference between|what is (a|an|the)|optimi[sz]e|debug|complexity)\b/.test(t)) {
         return 'technical';
+    }
+
+    // Social / greeting / pleasantry ("how's your day going", "how are you", "nice to meet you", "thank you for joining")
+    if (/\b(how('s| is) (your day|everything|it going|things)|how are you doing|how have you been|thank you for joining|thanks for joining|glad to have you|welcome to the interview)\b/i.test(t)) {
+        return 'social';
     }
 
     return 'general';
