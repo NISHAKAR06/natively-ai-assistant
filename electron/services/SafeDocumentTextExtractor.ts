@@ -299,13 +299,31 @@ export const extractSafeDocumentText = async (
     // mammoth has no cancellation/destroy surface at all, so a timeout here
     // (unlike the PDF branch) can't stop the underlying parse — it can only
     // give up waiting on it. Accepted asymmetry, not a gap in this fix.
+    // Preserves table columns, headings, and lists via structured HTML conversion first.
     const mammoth = require('mammoth');
-    const data: any = await withTimeout<any>(
-      mammoth.extractRawText({ path: filePath }),
-      'DOCX parse',
-      parseTimeoutMs,
-    );
-    content = String(data?.value || '');
+    let extracted = '';
+    try {
+      const htmlData: any = await withTimeout<any>(
+        mammoth.convertToHtml({ path: filePath }),
+        'DOCX html parse',
+        parseTimeoutMs,
+      );
+      const rawHtml = String(htmlData?.value || '');
+      if (rawHtml.trim()) {
+        extracted = htmlToText(rawHtml);
+      }
+    } catch {
+      // Fall back to extractRawText on error
+    }
+    if (!extracted.trim()) {
+      const data: any = await withTimeout<any>(
+        mammoth.extractRawText({ path: filePath }),
+        'DOCX parse',
+        parseTimeoutMs,
+      );
+      extracted = String(data?.value || '');
+    }
+    content = extracted;
   } else if (['.png', '.jpg', '.jpeg', '.webp'].includes(extension)) {
     try {
       const { OcrProviderManager } = require('./screen/OcrProviderManager');

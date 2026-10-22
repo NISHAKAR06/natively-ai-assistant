@@ -526,3 +526,21 @@ test('formatBodyPreservingTables leaves ordinary prose whitespace-collapsed (no 
   assert.doesNotMatch(out, /:\s/, 'prose must not be reshaped into label:value rows');
   assert.match(out, /19 degrees of freedom/, 'prose content preserved');
 });
+
+test('tabularChunks chunks markdown tables and repeats the header row', async () => {
+  const { tabularChunks } = await loadMap();
+  const table = [
+    '| Algorithm | Time Complexity | Space Complexity |',
+    '| --- | --- | --- |',
+    '| Token Bucket | O(1) | O(1) |',
+    '| Sliding Window | O(1) | O(N) |',
+    '| Leaky Bucket | O(1) | O(1) |',
+  ].join('\n');
+  const chunks = tabularChunks(table, 2);
+  assert.ok(chunks && chunks.length >= 2, 'expected markdown table to be chunked into multiple chunks');
+  for (const chunk of chunks) {
+    assert.match(chunk, /\[Table rows \d+-\d+\]/, 'chunk should have table row label');
+    assert.match(chunk, /\| Algorithm \| Time Complexity \| Space Complexity \|/, 'chunk must repeat header');
+    assert.match(chunk, /\| --- \| --- \| --- \|/, 'chunk must preserve divider');
+  }
+});

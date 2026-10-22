@@ -110,7 +110,15 @@ const TABLE_LABEL_MAX_WORDS = 5;
 
 function isProbableTableRow(line: string): { label: string; value: string } | null {
     const t = line.trim();
-    if (!t || t.length > 90) return null;               // long lines are prose
+    if (!t) return null;
+    // Markdown / pipe-delimited table row check
+    if (t.startsWith('|') && t.endsWith('|') && t.length > 2) {
+        const cells = t.split('|').map((c) => c.trim()).filter(Boolean);
+        if (cells.length >= 2) {
+            return { label: cells[0], value: cells.slice(1).join(' | ') };
+        }
+    }
+    if (t.length > 90) return null;               // long lines are prose
     if (/[.:;]$/.test(t)) return null;                   // sentence-terminated → prose
     if (hasDottedLeader(t)) return null;
     const m = t.match(TABLE_ROW_RE);
@@ -360,42 +368,52 @@ export function tabularChunks(content: string, rowsPerChunk?: number): string[] 
     content = normalizeLineEndings(content);
     const lines = content.split(/\r?\n/).filter((l) => l.trim().length > 0);
     if (lines.length < 3) return null; // need a header + at least a couple rows
-    // Pick the delimiter from the header: comma or tab, whichever splits into >=2
+    // Pick the delimiter from the header: pipe, tab, or comma, whichever splits into >=2
     // columns consistently across the sampled rows.
     const header = lines[0];
-    const delim = header.includes('\t') && !header.includes(',') ? '\t' : ',';
-    const cols = header.split(delim).length;
+    const isPipe = header.includes('|');
+    const delim = isPipe ? '|' : (header.includes('\t') && !header.includes(',') ? '\t' : ',');
+    const getCols = (line: string): string[] => {
+        if (isPipe) {
+            return line.split('|').map((s) => s.trim()).filter((s, idx, arr) => !(idx === 0 && !s) && !(idx === arr.length - 1 && !s));
+        }
+        return line.split(delim);
+    };
+    const cols = getCols(header).length;
     if (cols < 2) return null;
-    // Require the majority of sampled rows to have the same column count — this
-    // distinguishes a real table from prose that happens to contain commas.
-    const sample = lines.slice(1, Math.min(lines.length, 60));
-    const consistent = sample.filter((l) => Math.abs(l.split(delim).length - cols) <= 1).length;
-    if (consistent < sample.length * 0.8) return null;
 
-    // Field-shape guard (2026-07-23): column-count consistency alone accepts
-    // comma-rich PROSE — an academic paper's pdf-parse text has a comma on most
-    // lines with a stable ±1 field count, so a whole prose document (e.g.
-    // "Attention Is All You Need") was mis-detected as a 2-column CSV and chunked
-    // as `[Table rows N-M]` with ZERO `[Section N.N | …]` tags, defeating the
-    // hybrid retriever's section-target restore and starving §5.2-type answers.
-    // A genuine data cell is short and mostly a single token (a name, number, or
-    // short label); a prose clause between commas is a multi-word phrase. Reject
-    // when fields are predominantly multi-word — cleanly separates real CSV/TSV
-    // (≈1.0 words/field, 0% multi-word) from prose (≈5 words/field, ~50%+).
+    // Check if line 1 is a markdown divider row like |---|---|
+    const isDivider = (l: string) => /^\s*\|?\s*[-:]+(?:\s*\|\s*[-:]+)+\s*\|?\s*$/.test(l.trim());
+    let dividerLine: string | null = null;
+    let dataRows = lines.slice(1);
+    if (isPipe && dataRows.length > 0 && isDivider(dataRows[0])) {
+        dividerLine = dataRows[0].trim();
+        dataRows = dataRows.slice(1);
+    }
+    if (dataRows.length < 1) return null;
+
+    // Require the majority of sampled rows to have the same column count — this
+    // distinguishes a real table from prose that happens to contain commas/pipes.
+    const sample = dataRows.slice(0, Math.min(dataRows.length, 60));
+    const consistent = sample.filter((l) => Math.abs(getCols(l).length - cols) <= 1).length;
+    if (consistent < sample.length * 0.75) return null;
+
+    // Field-shape guard: reject when fields are predominantly multi-word sentences
+    // (distinguishes real tables/data from prose).
     let fieldCount = 0;
     let multiWordFields = 0;
     for (const line of sample) {
-        for (const field of line.split(delim)) {
+        for (const field of getCols(line)) {
+            const trimmed = field.trim();
+            if (!trimmed) continue;
             fieldCount++;
-            if (field.trim().split(/\s+/).filter(Boolean).length >= 3) multiWordFields++;
+            if (trimmed.split(/\s+/).filter(Boolean).length >= 4) multiWordFields++;
         }
     }
-    // >=30% of fields being 3+ words is far above any real table (a lone free-text
-    // "description"/"notes" column tops out well under this) yet far below prose.
-    if (fieldCount > 0 && multiWordFields / fieldCount >= 0.3) return null;
+    if (fieldCount > 0 && multiWordFields / fieldCount >= 0.4) return null;
 
     const headerLine = header.trim();
-    const rows = lines.slice(1);
+    const rows = dataRows;
     // ADAPTIVE granularity: small tables get SMALL chunks (finer granularity → each
     // chunk's embedding is specific to a few entities, so a query for one entity —
     // "United States population" — ranks that entity's chunk highly). Large tables
@@ -408,10 +426,11 @@ export function tabularChunks(content: string, rowsPerChunk?: number): string[] 
     const base = rowsPerChunk ?? MIN_ROWS;
     const effRows = Math.max(base, Math.ceil(rows.length / MAX_TABLE_CHUNKS));
     const chunks: string[] = [];
+    const fullHeader = dividerLine ? `${headerLine}\n${dividerLine}` : headerLine;
     for (let i = 0; i < rows.length; i += effRows) {
         const slice = rows.slice(i, i + effRows);
         // Repeat the header on every chunk so column semantics travel with the rows.
-        chunks.push(`[Table rows ${i + 1}-${i + slice.length}]\n${headerLine}\n${slice.join('\n')}`);
+        chunks.push(`[Table rows ${i + 1}-${i + slice.length}]\n${fullHeader}\n${slice.join('\n')}`);
     }
     return chunks.length > 0 ? chunks : null;
 }

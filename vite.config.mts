@@ -35,6 +35,7 @@ process.env.VITE_BUILD_COMMIT = buildCommit.startsWith('unknown')
 
 // https://vitejs.dev/config/
 export default defineConfig({
+    clearScreen: false,
     plugins: [react()],
     base: './', // Use relative paths for Electron
     resolve: {
@@ -57,6 +58,7 @@ export default defineConfig({
             ignored: [
                 '**/.claude/worktrees/**',
                 '**/.code-review-graph/**',
+                '**/dist/**',
                 '**/dist-electron/**',
                 '**/release/**',
                 // Browser extension has its own esbuild pipeline
