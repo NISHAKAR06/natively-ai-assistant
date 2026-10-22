@@ -82,3 +82,21 @@ export function resolveUnambiguousAssistantProbe(message: string): string | null
   const decision = resolveIdentityProbe(message, /* profileReady */ true);
   return decision.kind === 'assistant_reply' ? decision.reply : null;
 }
+
+/**
+ * Bare greeting probes (e.g. "hi", "hello", "hey", "good morning") typed directly
+ * into the manual chat bar. In an AI assistant, typing a greeting should produce an
+ * immediate polite greeting, without invoking an LLM, retrieving reference files,
+ * or dumping technical interview playbooks.
+ */
+const GREETING_PROBE_RE =
+  /^\s*(?:hi|hello|hey|hey\s+there|hi\s+there|good\s+(?:morning|afternoon|evening)|greetings|howdy|hola)[\s!.,?]*$/i;
+
+export function resolveGreetingProbe(message: string): string | null {
+  if (typeof message !== 'string' || !message.trim()) return null;
+  if (GREETING_PROBE_RE.test(message)) {
+    return "Hey! How can I help you today?";
+  }
+  return null;
+}
+

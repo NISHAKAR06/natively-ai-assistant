@@ -388,6 +388,9 @@ const CODE_SCOPED_RE = /\b(code|coding|program(?:s|ming)?|algorithms?|dsa|leetco
 const isCodeScopedDirective = (text: string): boolean =>
   CODE_SCOPED_RE.test(text) || analyzeUserInstructions(text).bindsProgrammingLanguage;
 
+const isCodingAnswerType = (t: AnswerType): boolean =>
+  t === 'coding_question_answer' || t === 'dsa_question_answer';
+
 /**
  * Split a raw custom-context blob into chunks. Prefers blank-line separated
  * paragraphs; if there are none, falls back to bullet/newline lines so a flat
@@ -535,7 +538,9 @@ export const selectCustomContextForAnswer = (
     const ordered = inSourceOrder(candidates);
     const formatContext = classified.definesAnswerFormat
       ?? analyzeUserInstructions(ordered.map(c => c.text).join('\n')).definesAnswerStructure;
-    const keepSentence = answerType === 'identity_answer' ? (t: string) => !isCodeScopedDirective(t) : undefined;
+    const keepSentence = (!isCodingAnswerType(answerType) || answerType === 'identity_answer')
+      ? (t: string) => !isCodeScopedDirective(t)
+      : undefined;
     const extracted = ordered.map(c => extractInstructionText(c.text, formatContext, keepSentence));
     for (let i = 0; i < ordered.length; i++) {
       const c = ordered[i];
@@ -554,7 +559,16 @@ export const selectCustomContextForAnswer = (
     return { included: inSourceOrder(directives), excluded, sensitiveIncluded: false };
   }
 
-  const included: CustomContextChunk[] = [...classified.pinned, ...classified.searchable];
+  const isCoding = isCodingAnswerType(answerType);
+  const rawCandidates = [...classified.pinned, ...classified.searchable];
+  const included: CustomContextChunk[] = [];
+  for (const c of rawCandidates) {
+    if (!isCoding && isCodeScopedDirective(c.text)) {
+      excluded.push({ category: c.category, reason: 'code_scoped_directive_for_non_coding_answer' });
+      continue;
+    }
+    included.push(c);
+  }
 
   let sensitiveIncluded = false;
   if (classified.sensitive.length) {

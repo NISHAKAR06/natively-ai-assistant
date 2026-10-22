@@ -121,6 +121,16 @@ export interface Classification {
 // arrive like this on every turn. Only unambiguous fillers are removed ("like",
 // "so", "right" are real words too); an immediately repeated word ("the the",
 // "5 5") collapses to one.
+const GREETING_RE = /\b(good|great|nice|pleasure) to (meet|see) you\b|\bgood (morning|afternoon|evening)\b|^\s*(hey|hi|hello)\b/i;
+const SOCIAL_PLEASANTRY_RE = /\b(trouble |any (trouble|problem)s? )?(finding|find) (the office|us|parking|the parking|your way|this place|the building)\b|\bfind (us|the office|parking|the building|your way|this place)\s+(ok(ay)?|alright|all right)\b|\bhow(?:\s+(?:was|is)|\s*['’]?s)\s+your\s+(weekend|day|morning|week|commute|drive|trip|flight)\b|\bhow(?:\s+are|\s*['’]?re)\s+you\s+(doing|feeling|holding up)\b|\bhow'?s the weather\b|\bdid you (get|grab|have) (any |some )?(coffee|water|tea|lunch)\b|\b(traffic|parking|weather|commute) (was|is|been)\b|\bhow was the (traffic|commute|drive|trip|flight|parking)\b/i;
+
+const isSmallTalkTurn = (text: string): boolean => {
+  const trimmed = (text || '').trim();
+  if (!trimmed) return false;
+  if (trimmed.split(/\s+/).filter(Boolean).length > 12) return false;
+  return GREETING_RE.test(trimmed) || SOCIAL_PLEASANTRY_RE.test(trimmed);
+};
+
 const FILLER_RE = /\b(?:um+|uh+|uhm|erm+|hmm+|hm+|arh+|ah+|er+|basically|you know|i mean)\b[,]?\s*/g;
 const STUTTER_RE = /\b(\w+)(?:\s+\1\b)+/g;
 // "right", "okay", "so", "like", "you know" are real words, so they are only
@@ -1543,6 +1553,7 @@ function detectTypes(q: string, input: ClassificationInput): { types: QuestionTy
   // path, and the model said "I don't have that number" over a sheet that has
   // it. Discourse lead-ins and hedges are not part of the question.
   if (modeHoldsDocuments && claims.size === 0 && !isBareFollowUp(q) && !techTask
+      && !isSmallTalkTurn(q)
       && !GENERATIVE_ASK_RE.test(q)
       && fragmentCoreWordCount(q) <= 8
       && !CODING_TASK_RE.test(q) && !SYSTEM_DESIGN_RE.test(q) && !TECH_SELF_TALK_RE.test(q)
@@ -1656,7 +1667,13 @@ function detectTypes(q: string, input: ClassificationInput): { types: QuestionTy
   const hasGeneral = types.has('GENERAL_TECHNICAL') || types.has('CODING_TASK') || types.has('SYSTEM_DESIGN');
   if (hasPrivate && hasGeneral) types.add('MIXED');
 
-  if (types.size === 0) types.add('AMBIGUOUS');
+  if (types.size === 0) {
+    if (isSmallTalkTurn(q)) {
+      types.add('GENERAL_TECHNICAL');
+    } else {
+      types.add('AMBIGUOUS');
+    }
+  }
   return { types: [...types], claims: [...claims], clauses, exhaustive, inferred: [...inferredClaims] };
 }
 

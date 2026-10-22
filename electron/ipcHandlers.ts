@@ -1910,8 +1910,9 @@ export function initializeIpcHandlers(appState: AppState): void {
             // question about the user. Same guards as the legacy probe: a skill
             // turn or an attached screen is never hijacked.
             if (!skillPromptBlock && !imagePaths?.length && typeof message === 'string') {
-              const { resolveUnambiguousAssistantProbe } = require('./llm/manualIdentityRouting') as typeof import('./llm/manualIdentityRouting');
-              const identityReply = resolveUnambiguousAssistantProbe(message);
+              const { resolveUnambiguousAssistantProbe, resolveGreetingProbe } = require('./llm/manualIdentityRouting') as typeof import('./llm/manualIdentityRouting');
+              const greetingReply = !options?.liveQuestion ? resolveGreetingProbe(message) : null;
+              const identityReply = resolveUnambiguousAssistantProbe(message) ?? greetingReply;
               if (identityReply) {
                 // The emission lives in replyWithAssistantIdentity, below this
                 // handler: several structure tests read this branch from its
@@ -2855,13 +2856,16 @@ export function initializeIpcHandlers(appState: AppState): void {
         // "/humanize who are you", which its fully-anchored regexes could not match.
         // Made explicit so the immunity does not depend on regex anchoring.
         if (!skillPromptBlock && !imagePaths?.length && typeof message === 'string') {
-          const { resolveIdentityProbe } = require('./llm/manualIdentityRouting') as typeof import('./llm/manualIdentityRouting');
+          const { resolveIdentityProbe, resolveGreetingProbe } = require('./llm/manualIdentityRouting') as typeof import('./llm/manualIdentityRouting');
           let probeProfileReady = false;
           try {
             const orchProbe = llmHelper.getKnowledgeOrchestrator?.();
             probeProfileReady = profileFactsReady((orchProbe as any)?.activeResume?.structured_data ?? null);
           } catch { /* no profile — assistant reply stands */ }
-          const probe = resolveIdentityProbe(message, probeProfileReady);
+          const greetingHit = !options?.liveQuestion ? resolveGreetingProbe(message) : null;
+          const probe = greetingHit
+            ? { kind: 'assistant_reply' as const, reply: greetingHit }
+            : resolveIdentityProbe(message, probeProfileReady);
           // candidate_fast_path → fall through; the fast-path block below owns it.
           if (probe.kind === 'assistant_reply') {
             const identityHit = probe.reply;
@@ -4769,7 +4773,14 @@ export function initializeIpcHandlers(appState: AppState): void {
             context,
             systemPromptOverride,
             ignoreKnowledge,
-            isCodingChat || isSafetyAnswer, // skipModeInjection; safety/coding must not pull active-mode resume/JD/reference context
+            (() => {
+              try {
+                const { isSmallTalkTurn } = require('./llm/steeringTail');
+                return isCodingChat || isSafetyAnswer || (typeof message === 'string' && isSmallTalkTurn(message));
+              } catch {
+                return isCodingChat || isSafetyAnswer;
+              }
+            })(), // skipModeInjection; safety/coding/smalltalk must not pull active-mode resume/JD/reference context
             [],    // extraDataScopes
             myController.signal,
             // Coding gets a small reasoning budget (correctness); everything else
