@@ -8166,6 +8166,31 @@ export function initializeIpcHandlers(appState: AppState): void {
           lastSequence = Math.max(lastSequence, streamEvent.sequence);
           if (streamEvent.type === 'done') {
             sendTerminal({ ...streamEvent, fullText } as DirectAssistStreamEvent);
+            // Persist Direct Assist turns into the active meeting session & history
+            try {
+              const im = appState.getIntelligenceManager?.();
+              if (im) {
+                im.addTranscript?.({
+                  text: String(request.currentRequest || ''),
+                  speaker: 'user',
+                  timestamp: Date.now(),
+                  final: true,
+                  origin: 'manual_chat',
+                }, true);
+                im.addAssistantMessage?.(fullText, undefined, 'manual_chat');
+                im.pushUsage?.({
+                  type: 'assist',
+                  timestamp: Date.now(),
+                  question: String(request.currentRequest || ''),
+                  answer: fullText,
+                  source: 'direct_assist',
+                  synthetic: true,
+                  imagePaths: request.imagePaths,
+                });
+              }
+            } catch (err) {
+              console.warn('[direct-assist] Failed to record usage/transcript:', err);
+            }
             // ── TRANSCRIBE THIS TURN'S SCREENSHOT, AFTER the answer ─────────
             // Direct Assist deliberately has no vision pre-pass: it is one
             // dispatch with nothing in front of it, and a 6-second

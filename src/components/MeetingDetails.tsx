@@ -1765,7 +1765,22 @@ const MeetingDetails: React.FC<MeetingDetailsProps> = ({ meeting: initialMeeting
     const isLight = useResolvedTheme() === 'light';
     // We need local state for the meeting object to reflect optimistic updates
     const [meeting, setMeeting] = useState<Meeting>(initialMeeting);
-    const [activeTab, setActiveTab] = useState<NotesTab>('summary');
+    const initialHasNotes = Boolean(
+        initialMeeting.detailedSummary?.schemaVersion === 3
+        || initialMeeting.detailedSummary?.overview?.trim()
+        || (initialMeeting.detailedSummary?.actionItems?.length ?? 0) > 0
+        || (initialMeeting.detailedSummary?.keyPoints?.length ?? 0) > 0
+        || (initialMeeting.detailedSummary?.sectionsV3?.length ?? 0) > 0
+    );
+    const [activeTab, setActiveTab] = useState<NotesTab>(() => {
+        if (initialMomentMs != null) return 'transcript';
+        if (!initialHasNotes && (initialMeeting.usage?.length || 0) > 0) return 'usage';
+        if (!initialHasNotes && (initialMeeting.transcript?.length || 0) > 0) return 'transcript';
+        return 'summary';
+    });
+    useEffect(() => {
+        setMeeting(initialMeeting);
+    }, [initialMeeting]);
     // How the tab panel arrives after the reader switches tabs (see switchTab):
     // from the side of travel, or a plain fade. null until the first switch, so
     // neither the first paint nor a jump that opens straight onto a tab
@@ -2681,7 +2696,7 @@ ${meeting.detailedSummary.keyPoints?.map(item => `- ${item}`).join('\n') || 'Non
                                             transition={{ type: "spring", stiffness: 400, damping: 30 }}
                                         />
                                     )}
-                                    {tab === 'summary' ? t('Summary') : tab === 'transcript' ? t('Transcript') : t('Usage')}
+                                    {tab === 'summary' ? t('Summary') : tab === 'transcript' ? t('Transcript') : (!hasRenderableNotes || meeting.title === 'Chat session' ? t('History') : t('Usage'))}
                                 </button>
                             ))}
                         </div>
@@ -2779,6 +2794,28 @@ ${meeting.detailedSummary.keyPoints?.map(item => `- ${item}`).join('\n') || 'Non
                                         {isRegenerating ? t('Generating…') : t('Try again')}
                                     </SwapText>
                                 </motion.button>
+                            </motion.div>
+                        ) : !hasRenderableNotes ? (
+                            <motion.div
+                                key="empty-chat-session"
+                                initial={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, y: 6 }}
+                                animate={prefersReducedMotion ? { opacity: 1 } : { opacity: 1, y: 0 }}
+                                transition={{ duration: 0.24, ease: [0.23, 1, 0.32, 1] }}
+                                className={`py-12 px-6 text-center rounded-xl border ${isLight ? 'border-black/[0.06] bg-black/[0.015]' : 'border-white/[0.06] bg-white/[0.02]'}`}
+                            >
+                                <p className="text-sm font-semibold text-text-primary mb-1">{t('No notes generated for this session')}</p>
+                                <p className="text-[12.5px] text-text-secondary leading-relaxed mb-4">
+                                    {t('This session was a direct chat and Q&A conversation. You can view all questions and answers under the History tab.')}
+                                </p>
+                                {(meeting.usage?.length || 0) > 0 && (
+                                    <button
+                                        type="button"
+                                        onClick={() => switchTab('usage')}
+                                        className={`h-8 inline-flex items-center gap-1.5 text-[12px] font-medium px-4 rounded-md text-text-primary transition-[color,background-color] ${isLight ? 'bg-black/[0.05] hover:bg-black/[0.09]' : 'bg-white/[0.06] hover:bg-white/[0.1]'}`}
+                                    >
+                                        {t('View History')} ({meeting.usage?.length})
+                                    </button>
+                                )}
                             </motion.div>
                         ) : (
                             <motion.div
@@ -3548,7 +3585,7 @@ ${meeting.detailedSummary.keyPoints?.map(item => `- ${item}`).join('\n') || 'Non
                                         );
                                     });
                                 })()}
-                                {!meeting.usage?.length && <p className="text-text-tertiary">{t('No usage history.')}</p>}
+                                {!meeting.usage?.length && <p className="text-text-tertiary">{t('No conversation history recorded for this session.')}</p>}
                             </section>
                         )}
                     </div>

@@ -957,6 +957,7 @@ const Launcher: React.FC<LauncherProps> = ({ request, onStartMeeting, onOpenSett
                                 variants={contentVariants}
                             >
                                 <MeetingDetails
+                                    key={selectedMeeting.id}
                                     meeting={selectedMeeting}
                                     initialMomentMs={selectedMomentMs ?? undefined}
                                     onBack={handleBack}

@@ -477,9 +477,17 @@ export class MeetingPersistence {
         if ((data.memoryEligibleCount ?? data.transcript.length) === 0) {
             const mins = Math.floor(data.durationMs / 60000);
             const secs = ((data.durationMs % 60000) / 1000).toFixed(0);
+            let sessionTitle = metadata?.title;
+            if (!sessionTitle || sessionTitle === 'Chat session') {
+                const firstQ = data.usage?.find((u: any) => u.question)?.question || data.transcript?.find((t: any) => t.speaker === 'user')?.text;
+                if (firstQ && typeof firstQ === 'string' && firstQ.trim().length > 0) {
+                    const cleanQ = firstQ.trim().replace(/^[\/$\w]+\s+/, '');
+                    sessionTitle = cleanQ.length > 50 ? cleanQ.slice(0, 47) + '...' : cleanQ;
+                }
+            }
             const finalMeeting: Meeting = {
                 id: meetingId,
-                title: metadata?.title || 'Chat session',
+                title: sessionTitle || 'Chat session',
                 date: new Date().toISOString(),
                 duration: `${mins}:${Number(secs) < 10 ? '0' : ''}${secs}`,
                 summary: '',
