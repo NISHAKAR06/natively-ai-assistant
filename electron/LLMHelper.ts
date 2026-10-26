@@ -13089,7 +13089,12 @@ let isMultimodal = !!(imagePaths?.length);
       : null;
     if (_gmeasure) console.log(`[Gemini.stream] +${Date.now() - _gt0}ms  cache resolve done (cacheHit=${Boolean(cacheName)}, sysPrompt=${systemInstruction?.length ?? 0}c, model=${model})`);
 
-    const buildConfig = (useCacheName: string | null) => ({
+    const shouldEnableGoogleSearch = (
+      /\b(?:what is|how does|how do|explain|difference between|compare|pros and cons|tradeoffs?|how to use|architecture of|why use|latest|overview of)\b/i.test(fullMessage) ||
+      /\b(?:search|research|grounding|google)\b/i.test(systemInstruction || '')
+    );
+
+    const buildConfig = (useCacheName: string | null, allowSearch: boolean = shouldEnableGoogleSearch) => ({
       maxOutputTokens: MAX_OUTPUT_TOKENS,
       temperature: INTERACTIVE_TEMPERATURE,
       seed: INTERACTIVE_SEED, // Gemini v1alpha honors seed in generationConfig
@@ -13107,6 +13112,7 @@ let isMultimodal = !!(imagePaths?.length);
       // server-side and usage may still be billed. The win here is freeing the
       // local connection + stopping downstream token work on cancel (audit finding #4).
       ...(abortSignal ? { abortSignal } : {}),
+      ...(allowSearch && !useCacheName ? { tools: [{ googleSearch: {} }] } : {}),
       ...(useCacheName
         ? { cachedContent: useCacheName }
         : systemInstruction
@@ -13134,14 +13140,22 @@ let isMultimodal = !!(imagePaths?.length);
       streamResult = await this.client.models.generateContentStream(request);
     } catch (err: any) {
       if (isAbortError(err)) return;
-      // The cache may have expired between getOrCreate() and this call. If we
-      // see a cache-related error, drop the entry and retry with systemInstruction.
       const msg = String(err?.message || err);
-      if (cacheName && /cached?[\s_]?content|not\s*found|expired/i.test(msg)) {
+      // If error is search-tool or grounding related, immediately retry without search tool:
+      if (/tool|search|grounding/i.test(msg)) {
+        console.warn(`[LLMHelper] Gemini search grounding unavailable (${msg}); retrying with direct model stream`);
+        try {
+          const retryRequest = { model, contents, config: buildConfig(cacheName, false) };
+          streamResult = await this.client.models.generateContentStream(retryRequest);
+        } catch (retryErr: any) {
+          if (isAbortError(retryErr)) return;
+          throw retryErr;
+        }
+      } else if (cacheName && /cached?[\s_]?content|not\s*found|expired/i.test(msg)) {
         console.warn(`[LLMHelper] Gemini cachedContent ${cacheName} stale (${msg}); retrying with systemInstruction`);
         this.geminiPromptCache.invalidate(cacheName);
         try {
-          const retryRequest = { model, contents, config: buildConfig(null) };
+          const retryRequest = { model, contents, config: buildConfig(null, false) };
           require('./llm/providerPayloadCapture').captureProviderPayload({
             provider: 'gemini', classification: 'sdk_request_object_before_serialization', payload: retryRequest,
           });

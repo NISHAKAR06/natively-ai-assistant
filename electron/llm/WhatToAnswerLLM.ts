@@ -330,6 +330,21 @@ ${promptInstruction.trim()}
             if (answerPlan) {
                 intentContextParts.push(formatAnswerPlanForPrompt(answerPlan, isCodeVerificationEnabled(), codingSignals.codingShape));
             }
+            const isTechnicalInterviewTurn = Boolean(
+                answerPlan?.answerType === 'technical_concept_answer'
+                || answerPlan?.answerType === 'system_design_answer'
+                || answerPlan?.answerType === 'debugging_question_answer'
+            );
+            if (isTechnicalInterviewTurn && !isSocialTurn) {
+                intentContextParts.push(`<conversational_spoken_directive>
+CRITICAL: The candidate will read your output ALOUD directly to the interviewer right now.
+- Output ONLY the exact conversational words to speak.
+- Speak naturally like a sharp, experienced engineer in real dialogue (e.g. "Yeah, so in my experience...", "The way I typically look at it is...", "Essentially, ...").
+- Ground the concept in practical real-world production experience: mention how engineers use it in production, real architectural tradeoffs, and key practical considerations.
+- BANNED: Never output textbook definitions ("X is defined as..."), academic essays, markdown headings (##), bullet points (- or *), numbered lists, tables, or asterisks.
+- Shape: 1 to 2 fluid, speakable paragraphs (about 3 to 5 natural conversational sentences, roughly 60 to 110 words).
+</conversational_spoken_directive>`);
+            }
             if (isSocialTurn) {
                 intentContextParts.push(`<social_greeting_directive>
 The interviewer is offering an introduction, pleasantry, or social greeting (e.g. "How is your day going?").

@@ -464,22 +464,12 @@ const DESIGN_FOLLOW_UP_REROUTABLE: ReadonlySet<AnswerType> = new Set<AnswerType>
   'general_meeting_answer',
 ]);
 
-const DEBUGGING_TEMPLATE = `Use exactly these sections:
-
-Likely Cause:
-[Most probable root cause.]
-
-How I Would Investigate:
-[Concrete debugging steps.]
-
-Fix:
-[Specific fix or mitigation.]
-
-Validation:
-[How to prove it works.]
-
-Prevention:
-[How to prevent recurrence.]`;
+const DEBUGGING_TEMPLATE = `You are the candidate SPEAKING this answer aloud to an interviewer in a live conversation. Give the exact words you'd SAY — practical, structured, and spoken.
+Output ONE fluid conversational response (3-5 natural spoken sentences, NO section titles or bullet headings):
+1. Start naturally with the most probable root cause you'd suspect based on experience (e.g. "Whenever I see that in production, the first thing I suspect is...").
+2. Explain the first 1-2 concrete diagnostic steps you'd take (checking service logs, distributed traces, or reproducing with minimal test input).
+3. Mention how you'd fix it and verify the mitigation without breaking existing flows.
+Sound like an experienced engineer diagnosing an issue calmly and methodically in a conversation.`;
 
 const DIRECT_SHORT_TEMPLATE = `Answer directly in 1-2 sentences. Do not include irrelevant context. Do not mention loaded context.`;
 // Skill experience / self-rating asks ("rate Python out of 10", "how strong is your
@@ -504,24 +494,26 @@ const DOCUMENT_FOLLOWUP_TEMPLATE = `Answer the follow-up from the uploaded docum
 // Generic technical-concept answers (what is Redis / JWT / CORS / caching / REST) were
 // coming back as long beginner TUTORIALS. In an interview the user needs a short, confident
 // spoken answer, not a classroom lesson (spoken-answer-quality sprint 2026-06-15).
-const TECHNICAL_CONCEPT_TEMPLATE = `You are the candidate SPEAKING this answer aloud to an interviewer. Give the exact words you'd SAY — a short, plain spoken answer, NOT documentation.
+const TECHNICAL_CONCEPT_TEMPLATE = `You are the candidate SPEAKING this answer aloud to an interviewer in a live conversation. Give the exact words you'd SAY — a natural, humanized conversational spoken answer, NOT documentation or a tutorial.
 
-THIS IS A SPOKEN ANSWER. Output MUST be ONE short paragraph of plain sentences. It is WRONG if it contains ANY of these:
+THIS IS A SPOKEN ANSWER. The user will read this text directly to the interviewer. Output MUST be one short paragraph of natural conversational sentences woven into prose. It is WRONG if it contains ANY of these:
 - a markdown heading (## or **Heading**)
 - a bullet list or a numbered list
 - a "Key Concepts" / "How it works" / "Common use cases" / "Performance" section
+- an academic/dictionary opening ("X is defined as...")
 - a code block or a code example
 - a table
 
-Shape:
-- 2 to 4 sentences, usually 40 to 80 words. If a single sentence answers it, stop there.
-- Sentence 1 is a plain one-line definition. Then at most one or two sentences with the single most relevant tradeoff or use, woven into prose.
+Conversational Shape & Delivery:
+- 2 to 4 spoken sentences, usually 50 to 90 words.
+- Sentence 1 starts naturally the way an experienced engineer actually talks in an interview (e.g. "Yeah, so in my experience...", "The way I typically look at it is...", "Essentially, ...") with a plain one-line definition woven into practical context.
+- Then 1 to 2 sentences connecting it to real-world engineering experience: where it is used in production, key architectural tradeoffs, and practical edge cases.
 - No analogy unless the user asked for simple terms / "explain like I'm 5".
 
 Example of the RIGHT shape (for "what is Redis?"):
-"Redis is an in-memory key-value store, so reads and writes are extremely fast. People mostly use it for caching, sessions, and rate limiting, and the main tradeoff is that it lives in memory, so you watch cost and what data really belongs there."
+"Yeah, so in my experience, Redis is basically our go-to in-memory key-value store when we need ultra-fast reads and writes. People mostly use it for caching API responses, managing user sessions, and rate limiting. The main tradeoff is that it lives in memory, so you have to be deliberate about memory costs and persistence with RDB or AOF."
 
-Sound like a competent engineer answering quickly in conversation — calm, specific, done in about 20 seconds.`;
+Sound like a sharp, practical engineer having a natural conversation — warm, confident, done in about 20-30 seconds.`;
 
 // SALES voice (manual regression 2026-06-12): real sales-mode sessions answered
 // "why is your product expensive?" with "I'm Natively, an AI assistant. I don't
