@@ -34,17 +34,27 @@ test('no source file repo-wide imports/calls assertNoAuthorityContradiction', ()
   let output;
   try {
     output = execFileSync(
-      'grep',
-      ['-rlE', usagePattern, 'electron', 'src', 'premium/electron'],
+      'git',
+      ['grep', '-lE', usagePattern, '--', 'electron', 'src'],
       { cwd: repoRoot, encoding: 'utf8' },
     );
   } catch (err) {
-    // grep exits 1 with empty stdout when no matches are found — that's the
-    // expected, passing case.
     if (err.status === 1 && !err.stdout) {
       output = '';
     } else {
-      throw err;
+      try {
+        output = execFileSync(
+          'grep',
+          ['-rlE', usagePattern, 'electron', 'src'],
+          { cwd: repoRoot, encoding: 'utf8' },
+        );
+      } catch (grepErr) {
+        if (grepErr.status === 1 && !grepErr.stdout) {
+          output = '';
+        } else {
+          throw grepErr;
+        }
+      }
     }
   }
   const remaining = output

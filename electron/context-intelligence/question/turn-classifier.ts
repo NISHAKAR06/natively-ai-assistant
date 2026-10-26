@@ -124,15 +124,17 @@ export interface Classification {
 const GREETING_RE = /\b(good|great|nice|pleasure) to (meet|see) you\b|\bgood (morning|afternoon|evening)\b|^\s*(hey|hi|hello)\b/i;
 const SOCIAL_PLEASANTRY_RE = /\b(trouble |any (trouble|problem)s? )?(finding|find) (the office|us|parking|the parking|your way|this place|the building)\b|\bfind (us|the office|parking|the building|your way|this place)\s+(ok(ay)?|alright|all right)\b|\bhow(?:\s+(?:was|is)|\s*['’]?s)\s+your\s+(weekend|day|morning|week|commute|drive|trip|flight)\b|\bhow(?:\s+are|\s*['’]?re)\s+you\s+(doing|feeling|holding up)\b|\bhow'?s the weather\b|\bdid you (get|grab|have) (any |some )?(coffee|water|tea|lunch)\b|\b(traffic|parking|weather|commute) (was|is|been)\b|\bhow was the (traffic|commute|drive|trip|flight|parking)\b/i;
 const INTERVIEWER_INTRO_RE = /\b(?:my name is|i am an? ai|i'm an? ai|thank(?:s| you) for joining|before starting(?: the interview)?)\b/i;
+const CANDIDATE_INTRO_RE = /\b(?:self-?introduction|introduce (?:yourself|myself)|tell (?:me|us) about yourself|(?:about|on) (?:yourself|myself)|(?:your|my) background)\b/i;
 
 const isSmallTalkTurn = (text: string): boolean => {
   const trimmed = (text || '').trim();
   if (!trimmed) return false;
+  if (CANDIDATE_INTRO_RE.test(trimmed)) return false;
+  if (CODING_TASK_RE.test(trimmed) || PROJECT_RE.test(trimmed) || SKILL_RE.test(trimmed) || SYSTEM_DESIGN_RE.test(trimmed) || EDUCATION_RE.test(trimmed) || EMPLOYMENT_RE.test(trimmed)) {
+    return false;
+  }
   if (GREETING_RE.test(trimmed) || SOCIAL_PLEASANTRY_RE.test(trimmed) || INTERVIEWER_INTRO_RE.test(trimmed)) {
-    if (trimmed.split(/\s+/).filter(Boolean).length <= 12) return true;
-    if (!CODING_TASK_RE.test(trimmed) && !PROJECT_RE.test(trimmed) && !SKILL_RE.test(trimmed) && !SYSTEM_DESIGN_RE.test(trimmed) && !EDUCATION_RE.test(trimmed) && !EMPLOYMENT_RE.test(trimmed)) {
-      return true;
-    }
+    return true;
   }
   return false;
 };

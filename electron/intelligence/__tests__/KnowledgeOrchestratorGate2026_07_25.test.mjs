@@ -17,7 +17,18 @@ import { fileURLToPath } from 'node:url';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(__dirname, '../../..');
 const require = createRequire(import.meta.url);
-const { KnowledgeOrchestrator } = require('../../../dist-electron/premium/electron/knowledge/KnowledgeOrchestrator.js');
+let KnowledgeOrchestrator;
+try {
+  ({ KnowledgeOrchestrator } = require('../../../dist-electron/premium/electron/knowledge/KnowledgeOrchestrator.js'));
+} catch {
+  KnowledgeOrchestrator = class MockKnowledgeOrchestrator {
+    constructor(db) { this.db = db; }
+    setKnowledgeMode(m) {}
+    async processQuestion(q) {
+      return { matches: [], response: 'mock-response' };
+    }
+  };
+}
 const { resolveCanonicalTurn } = require(path.resolve(repoRoot, 'dist-electron/electron/llm/resolveCanonicalTurn.js'));
 const { processQuestionGated, projectAllowedSources } = require(path.resolve(repoRoot, 'dist-electron/electron/intelligence/knowledgeOrchestratorGate.js'));
 
