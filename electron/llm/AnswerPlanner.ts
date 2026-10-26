@@ -489,6 +489,11 @@ const DIRECT_SHORT_TEMPLATE = `Answer directly in 1-2 sentences. Do not include 
 // loaded experience; speak to the user about their own skill.
 const SKILL_RATING_TEMPLATE = `Answer in 1-2 sentences as the candidate. If asked to rate a skill (e.g. "out of 10"), GIVE a concrete number grounded in the loaded experience and add one phrase of justification. Never refuse, never say you are an AI or that you "cannot assign ratings". Do not mention the profile/context explicitly — just answer confidently.`;
 const GENERAL_TEMPLATE = `Answer naturally and directly. Use only relevant context. Keep it predictable and concise.`;
+const SOCIAL_GREETING_TEMPLATE = `Answer warmly, politely, and concisely in 1-2 spoken sentences as the candidate (e.g., "I'm doing well, thank you! Excited to be here today. How are you?").
+Do not dump projects, resume facts, technical skills, or reference documents. Keep it conversational and brief.`;
+
+const SOCIAL_QUESTION_RE = /\b(how(?:\s+(?:was|is)|\s*['’]?s)\s+your\s+(weekend|day|morning|week|commute|drive|trip|flight)|how(?:\s+are|\s*['’]?re)\s+you\s+(doing|feeling|holding up)|nice to meet you|good to meet you|pleasure to meet you|thank(?:s| you) for joining|how(?:'s| is) (everything|things|it going))\b/i;
+const BARE_GREETING_RE = /^\s*(?:hi|hello|hey|hey\s+there|hi\s+there|good\s+(?:morning|afternoon|evening)|greetings|howdy|hola)[\s!.,?]*$/i;
 const DOCUMENT_DEFINITION_TEMPLATE = `Answer from the uploaded document evidence only. Give a concise definition in 1-3 sentences. Prefer text that explicitly defines the term ("is", "are", "refers to", "represents") and do not drift into procedures or training details unless the question asks for them.`;
 const DOCUMENT_LIST_TEMPLATE = `Answer from the uploaded document evidence only. Return the complete list the question asks for. Scan every retrieved excerpt before answering; include all listed items, phases, questions, models, objects, or components that are literally present. Do not stop at the first matching excerpt and do not invent missing list items.`;
 const DOCUMENT_NUMERIC_TEMPLATE = `Answer from the uploaded document evidence only. Report exact values with units and the entity they belong to. If multiple related values are present (training/peak/inference, control/sampling, per-model rates), include all of them. Do not infer numbers that are not written in the evidence.`;
@@ -1771,10 +1776,16 @@ export const planAnswer = (input: PlanAnswerInput): AnswerPlan => {
   );
   const wantsNegotiationAdvice = NEGOTIATION_ADVICE_CUE_RE.test(text);
 
+  const isSocialQuestion = extractedType === 'social'
+    || ((SOCIAL_QUESTION_RE.test(question) || BARE_GREETING_RE.test(question) || SOCIAL_QUESTION_RE.test(text) || BARE_GREETING_RE.test(text))
+        && !hasWriteCodeVerb && !hasExplicitCodingVerb);
+
   if (!question) {
     answerType = 'unknown_answer';
   } else if (isStealthEvasion) {
     answerType = 'ethical_usage_answer';
+  } else if (isSocialQuestion) {
+    answerType = 'general_meeting_answer';
   } else if (wantsSourceEvidence) {
     answerType = 'source_code_evidence_answer';
   } else if (wantsProjectLink) {
@@ -2159,6 +2170,9 @@ export const planAnswer = (input: PlanAnswerInput): AnswerPlan => {
     && !/\bmy\b/i.test(text.replace(/\binterview my\b/gi, '')); // "what are MY skills" → keep 2nd-person list
 
   const voicePerspective: VoicePerspective = (() => {
+    if (isSocialQuestion && interviewerAsked) {
+      return 'first_person_candidate';
+    }
     if (CANDIDATE_VOICE_TYPES.has(answerType)) {
       // Profile-directed answer types speak AS the candidate live, or tell the
       // user about themselves in a manual chat.
@@ -2204,11 +2218,13 @@ export const planAnswer = (input: PlanAnswerInput): AnswerPlan => {
     speakerPerspective,
     outputPerspective,
     voicePerspective,
-    profileContextPolicy,
+    profileContextPolicy: isSocialQuestion ? 'forbidden' : profileContextPolicy,
     resolvedEntity,
-    requiredContextLayers: requiredLayersFor(answerType, documentGroundedCustomModeActive),
-    forbiddenContextLayers: forbiddenLayersFor(answerType),
-    responseTemplate: templateFor(answerType),
+    requiredContextLayers: isSocialQuestion ? ['live_transcript'] : requiredLayersFor(answerType, documentGroundedCustomModeActive),
+    forbiddenContextLayers: isSocialQuestion
+      ? ['resume', 'jd', 'negotiation', 'reference_files', 'custom_context']
+      : forbiddenLayersFor(answerType),
+    responseTemplate: isSocialQuestion ? SOCIAL_GREETING_TEMPLATE : templateFor(answerType),
     maxFirstUsefulTokenMs: latencyMs,
     maxInitialLatencyMs: latencyMs, // deprecated alias
     requiresLLM: !fastPathTypes.includes(answerType),

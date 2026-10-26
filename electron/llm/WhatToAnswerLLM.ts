@@ -314,6 +314,13 @@ ${promptInstruction.trim()}
 </dynamic_action_instruction>`
                 : undefined;
 
+            const isSocialTurn = Boolean(
+                (requestSnapshot as any)?.extractedQuestion?.questionType === 'social'
+                || (answerPlan as any)?.responseTemplate?.includes('Answer warmly, politely, and concisely')
+                || /\b(how(?:\s+(?:was|is)|\s*['’]?s)\s+your\s+(weekend|day|morning|week|commute|drive|trip|flight)|how(?:\s+are|\s*['’]?re)\s+you\s+(doing|feeling|holding up)|nice to meet you|good to meet you|pleasure to meet you|thank(?:s| you) for joining|how(?:'s| is) (everything|things|it going))\b/i.test(answerPlan?.question || '')
+                || /^\s*(?:hi|hello|hey|hey\s+there|hi\s+there|good\s+(?:morning|afternoon|evening)|greetings|howdy|hola)[\s!.,?]*$/i.test(answerPlan?.question || '')
+            );
+
             const intentContextParts = [];
             // <intent_and_shape> removed 2026-09-05. It only ever entered the v2/v1
             // carriers, both discarded whenever V3 composes the turn (default ON),
@@ -322,6 +329,13 @@ ${promptInstruction.trim()}
             void intentResult;
             if (answerPlan) {
                 intentContextParts.push(formatAnswerPlanForPrompt(answerPlan, isCodeVerificationEnabled(), codingSignals.codingShape));
+            }
+            if (isSocialTurn) {
+                intentContextParts.push(`<social_greeting_directive>
+The interviewer is offering an introduction, pleasantry, or social greeting (e.g. "How is your day going?").
+Respond directly, warmly, and concisely as the candidate in 1-2 spoken sentences (e.g., "I'm doing well, thank you! Excited to be here today. How are you?").
+DO NOT dump your resume, projects, technical skills, or reference files. Keep it natural, polite, and brief.
+</social_greeting_directive>`);
             }
             if (instructionContext) {
                 intentContextParts.push(instructionContext);
@@ -479,7 +493,7 @@ The user triggered this action with a coding problem on screen and NO new questi
                         console.warn('[ScopeFallback] reference_files policy unreadable; using default-allow (explicit denial still omits-at-source below)');
                     }
                     // Unified context-route enforcement: forbidden always wins.
-                    if (answerPlan && !isLayerAllowed(answerPlan, 'reference_files')) {
+                    if ((answerPlan && !isLayerAllowed(answerPlan, 'reference_files')) || isSocialTurn) {
                         referenceFilesAllowed = false;
                     }
                     // R2 (2026-08-12, review finding): this override used the BROAD
@@ -489,7 +503,7 @@ The user triggered this action with a coding problem on screen and NO new questi
                     // rationale only holds when the mode's contract is genuinely
                     // strict ("answer only from the files") — everywhere else the
                     // user's denial wins and the reference layer is simply omitted.
-                    if (strictDocGroundedActive) {
+                    if (strictDocGroundedActive && !isSocialTurn) {
                         if (!referenceFilesAllowed) {
                             console.warn('[WhatToAnswerLLM] Generic/reference layer exclusion overridden: strict document-grounded mode active', {
                                 genericBypassDisabledReason: 'strict_document_grounded_mode',
@@ -833,8 +847,8 @@ The user triggered this action with a coding problem on screen and NO new questi
             // flag on), REPLACE the raw mode block with the typed pack (built from
             // that same block — no re-retrieval) and suppress the candidate_profile
             // factual block. One factual pipeline. Flag off / absent → legacy.
-            let typedModeContext = modeContextBlock;
-            let typedCandidateProfile = effectiveCandidateProfile;
+            let typedModeContext = isSocialTurn ? '' : modeContextBlock;
+            let typedCandidateProfile = isSocialTurn ? '' : effectiveCandidateProfile;
             let transcriptForPrompt = workingTranscript;
             // Set when the Context OS pack governs this turn (v2 turn envelope
             // must stand down — its escaping would corrupt the rendered pack).

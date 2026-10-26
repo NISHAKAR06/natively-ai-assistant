@@ -123,12 +123,18 @@ export interface Classification {
 // "5 5") collapses to one.
 const GREETING_RE = /\b(good|great|nice|pleasure) to (meet|see) you\b|\bgood (morning|afternoon|evening)\b|^\s*(hey|hi|hello)\b/i;
 const SOCIAL_PLEASANTRY_RE = /\b(trouble |any (trouble|problem)s? )?(finding|find) (the office|us|parking|the parking|your way|this place|the building)\b|\bfind (us|the office|parking|the building|your way|this place)\s+(ok(ay)?|alright|all right)\b|\bhow(?:\s+(?:was|is)|\s*['’]?s)\s+your\s+(weekend|day|morning|week|commute|drive|trip|flight)\b|\bhow(?:\s+are|\s*['’]?re)\s+you\s+(doing|feeling|holding up)\b|\bhow'?s the weather\b|\bdid you (get|grab|have) (any |some )?(coffee|water|tea|lunch)\b|\b(traffic|parking|weather|commute) (was|is|been)\b|\bhow was the (traffic|commute|drive|trip|flight|parking)\b/i;
+const INTERVIEWER_INTRO_RE = /\b(?:my name is|i am an? ai|i'm an? ai|thank(?:s| you) for joining|before starting(?: the interview)?)\b/i;
 
 const isSmallTalkTurn = (text: string): boolean => {
   const trimmed = (text || '').trim();
   if (!trimmed) return false;
-  if (trimmed.split(/\s+/).filter(Boolean).length > 12) return false;
-  return GREETING_RE.test(trimmed) || SOCIAL_PLEASANTRY_RE.test(trimmed);
+  if (GREETING_RE.test(trimmed) || SOCIAL_PLEASANTRY_RE.test(trimmed) || INTERVIEWER_INTRO_RE.test(trimmed)) {
+    if (trimmed.split(/\s+/).filter(Boolean).length <= 12) return true;
+    if (!CODING_TASK_RE.test(trimmed) && !PROJECT_RE.test(trimmed) && !SKILL_RE.test(trimmed) && !SYSTEM_DESIGN_RE.test(trimmed) && !EDUCATION_RE.test(trimmed) && !EMPLOYMENT_RE.test(trimmed)) {
+      return true;
+    }
+  }
+  return false;
 };
 
 const FILLER_RE = /\b(?:um+|uh+|uhm|erm+|hmm+|hm+|arh+|ah+|er+|basically|you know|i mean)\b[,]?\s*/g;
@@ -954,7 +960,8 @@ function detectTypes(q: string, input: ClassificationInput): { types: QuestionTy
       : LEGACY_CANDIDATE_PERSON_RE.test(clause);
     // Second person carried by the main verb rather than an auxiliary.
     const secondPersonPast = tokenFramingOn() && SECOND_PERSON_PAST_RE.test(clause);
-    const personal = !screenArtifactOwnership && !aboutAssistant && !salesClaimCue && (PERSONAL_RE.test(clause)
+    const isSocialClause = GREETING_RE.test(clause) || SOCIAL_PLEASANTRY_RE.test(clause) || INTERVIEWER_INTRO_RE.test(clause);
+    const personal = !screenArtifactOwnership && !aboutAssistant && !salesClaimCue && !isSocialClause && (PERSONAL_RE.test(clause)
       || candidateAsPerson
       || secondPersonPast
       || (FIRST_PERSON_RE.test(clause)
@@ -1454,7 +1461,7 @@ function detectTypes(q: string, input: ClassificationInput): { types: QuestionTy
   // directions). A grammar rule here was written, broke those tests, and was
   // removed.
   const hasPrivateClaim2 = [...claims].some((c) => (CLAIM_AUTHORITY[c]?.authoritative ?? []).length > 0);
-  if (!hasPrivateClaim2 && !techTask && !conceptOnly
+  if (!hasPrivateClaim2 && !techTask && !conceptOnly && !isSmallTalkTurn(q)
       && (namesEntity || primaryClaimsIt || definiteValueLookup)) {
     const primary = primarySource;
     const claimForSource: Partial<Record<SourceType, ClaimType>> = {
@@ -1667,12 +1674,13 @@ function detectTypes(q: string, input: ClassificationInput): { types: QuestionTy
   const hasGeneral = types.has('GENERAL_TECHNICAL') || types.has('CODING_TASK') || types.has('SYSTEM_DESIGN');
   if (hasPrivate && hasGeneral) types.add('MIXED');
 
-  if (types.size === 0) {
-    if (isSmallTalkTurn(q)) {
-      types.add('GENERAL_TECHNICAL');
-    } else {
-      types.add('AMBIGUOUS');
-    }
+  if (isSmallTalkTurn(q)) {
+    types.clear();
+    claims.clear();
+    types.add('GENERAL_TECHNICAL');
+    noteClaim('GENERAL_TECHNICAL', q);
+  } else if (types.size === 0) {
+    types.add('AMBIGUOUS');
   }
   return { types: [...types], claims: [...claims], clauses, exhaustive, inferred: [...inferredClaims] };
 }

@@ -3073,6 +3073,7 @@ export class IntelligenceEngine extends EventEmitter {
                 // the JIT).
                 var _wtaPlan: any = planAnswer({
                     question: String(_wtaQ),
+                    extractedQuestion,
                     source: 'what_to_answer',
                     speakerPerspective: 'interviewer',
                     activeMode: snapshotModeInfo,
