@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { X, Plus, Trash2, Upload, FileText, Check, Sparkles, Save, Loader2 } from 'lucide-react';
 import { ModesSettings as PremiumModesSettings } from '../../premium';
+import { AipSelect } from './AIProvidersSettings';
 
 const TEMPLATE_OPTIONS = [
   { value: 'general', label: 'General' },
@@ -231,17 +232,13 @@ const BuiltinModesSettings: React.FC<ModesSettingsProps> = ({ onClose }) => {
                 onChange={(e) => setNewModeName(e.target.value)}
                 className="w-full rounded-md border border-border-muted bg-bg-input px-2.5 py-1.5 text-xs text-text-primary focus:outline-none"
               />
-              <select
+              <AipSelect
+                label="Base template"
                 value={newModeTemplate}
-                onChange={(e) => setNewModeTemplate(e.target.value)}
-                className="w-full rounded-md border border-border-muted bg-bg-input px-2 py-1.5 text-xs text-text-primary focus:outline-none"
-              >
-                {TEMPLATE_OPTIONS.map((t) => (
-                  <option key={t.value} value={t.value}>
-                    {t.label}
-                  </option>
-                ))}
-              </select>
+                onChange={(val) => setNewModeTemplate(val)}
+                options={TEMPLATE_OPTIONS.map((t) => ({ id: t.value, name: t.label }))}
+                className="w-full text-xs"
+              />
               <div className="flex justify-end gap-1.5">
                 <button
                   onClick={() => setShowCreateForm(false)}
