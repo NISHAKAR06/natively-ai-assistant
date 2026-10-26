@@ -524,13 +524,19 @@ const ModelSelectorWindow = () => {
                                     )}
                                     <div className="flex flex-col gap-px">
                                         {group.rows.map((model) => {
-                                            const isSelected = currentModel === model.id;
+                                            const isSelected = currentModel === model.id || (model.type === 'ollama' && (currentModel === model.id || currentModel === model.id.replace(/^ollama-/, '')));
                                             return (
                                                 <button
                                                     key={model.id}
                                                     role="option"
                                                     aria-selected={isSelected}
                                                     data-selected={isSelected ? 'true' : undefined}
+                                                    onMouseDown={(e) => {
+                                                        // Immediately handle selection on mouse down before any external blur/dismiss
+                                                        e.preventDefault();
+                                                        e.stopPropagation();
+                                                        handleSelectFn(model.id);
+                                                    }}
                                                     onClick={() => handleSelectFn(model.id)}
                                                     className={`w-full h-[30px] pl-2 pr-1.5 flex items-center gap-1.5 text-left rounded-[10px] transition-colors duration-100 overlay-text-primary model-selector-row ${rowHoverClass} ${isSelected ? 'model-selector-row-selected' : ''}`}
                                                 >

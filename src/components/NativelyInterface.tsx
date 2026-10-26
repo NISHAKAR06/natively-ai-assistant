@@ -2229,13 +2229,13 @@ const NativelyInterface: React.FC<NativelyInterfaceProps> = ({
   }, []);
 
   // Model Selection State
-  const [currentModel, setCurrentModel] = useState<string>('gemini-3-flash-preview');
+  const [currentModel, setCurrentModel] = useState<string>('gemini-3.8-flash');
   // Human-readable label for `currentModel`. Authoritative source is the
   // `getCurrentLlmConfig.displayName` IPC field (always fresh, including for
   // custom-provider UUIDs whose user-defined name can change while the
   // overlay is open). Falls back to `currentModel` itself if the IPC has not
   // resolved yet.
-  const [currentModelDisplayName, setCurrentModelDisplayName] = useState<string>('gemini-3-flash-preview');
+  const [currentModelDisplayName, setCurrentModelDisplayName] = useState<string>('Gemini 3.8 Flash');
 
   const refreshCurrentModel = useCallback(async () => {
     try {
@@ -2291,9 +2291,10 @@ const NativelyInterface: React.FC<NativelyInterfaceProps> = ({
 
   useEffect(() => {
     if (!window.electronAPI?.onModelChanged) return;
-    const unsubscribe = window.electronAPI.onModelChanged(() => {
+    const unsubscribe = window.electronAPI.onModelChanged((modelId?: string) => {
       // Re-fetch so displayName stays in sync with the active model — covers
       // custom-provider renames that don't otherwise trigger a refresh.
+      if (modelId) setCurrentModel(modelId);
       refreshCurrentModel();
     });
     return () => unsubscribe();

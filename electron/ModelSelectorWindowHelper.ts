@@ -73,11 +73,11 @@ export class ModelSelectorWindowHelper {
 
         const activate = options.activate ?? true;
 
-        // Set parent and align window settings
+        // Set parent on macOS to align panel behavior without owner-stealing focus
         const mainWin = this.windowHelper?.getMainWindow();
         const isOverlay = mainWin === this.windowHelper?.getOverlayWindow();
 
-        if (mainWin && !mainWin.isDestroyed()) {
+        if (process.platform === "darwin" && mainWin && !mainWin.isDestroyed()) {
             this.window.setParentWindow(mainWin);
         }
 

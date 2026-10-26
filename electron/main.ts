@@ -2502,6 +2502,8 @@ export class AppState {
     const targets = [
       this.getWindowHelper().getOverlayWindow(),
       this.modelSelectorWindowHelper.getWindow(),
+      this.settingsWindowHelper?.getSettingsWindow?.(),
+      this.getWindowHelper().getLauncherWindow(),
     ];
     const seen = new Set<number>();
     for (const win of targets) {

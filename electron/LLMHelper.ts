@@ -2966,9 +2966,10 @@ export class LLMHelper {
     this.currentModelId = targetModelId;
 
     // Update specific model props if needed
-    if (targetModelId === GEMINI_PRO_MODEL) this.geminiModel = GEMINI_PRO_MODEL;
-    if (targetModelId === GEMINI_FLASH_MODEL) this.geminiModel = GEMINI_FLASH_MODEL;
-    if (targetModelId === GEMINI_FLASH_LITE_MODEL) this.geminiModel = GEMINI_FLASH_LITE_MODEL;
+    if (this.isGeminiModel(targetModelId)) this.geminiModel = targetModelId;
+    else if (targetModelId === GEMINI_PRO_MODEL) this.geminiModel = GEMINI_PRO_MODEL;
+    else if (targetModelId === GEMINI_FLASH_MODEL) this.geminiModel = GEMINI_FLASH_MODEL;
+    else if (targetModelId === GEMINI_FLASH_LITE_MODEL) this.geminiModel = GEMINI_FLASH_LITE_MODEL;
 
     console.log(`[LLMHelper] Switched to Model: ${targetModelId}`);
     // Keep OpenRouter's "which models read images" answers current (2026-10-01).
@@ -14388,7 +14389,9 @@ let isMultimodal = !!(imagePaths?.length);
   public getCurrentModelId(): string {
     if (this.customProvider) return this.customProvider.id;
     if (this.activeCurlProvider) return this.activeCurlProvider.id;
-    return this.useOllama ? this.ollamaModel : this.currentModelId;
+    return this.useOllama
+      ? (this.ollamaModel ? (this.ollamaModel.startsWith('ollama-') ? this.ollamaModel : `ollama-${this.ollamaModel}`) : 'ollama')
+      : this.currentModelId;
   }
 
   /**
@@ -15316,7 +15319,9 @@ let isMultimodal = !!(imagePaths?.length);
     }
     if (this.customProvider) return this.customProvider.name;
     if (this.activeCurlProvider) return this.activeCurlProvider.id;
-    return this.useOllama ? this.ollamaModel : this.currentModelId;
+    return this.useOllama
+      ? (this.ollamaModel ? this.ollamaModel.replace(/^ollama-/, '') : 'Ollama')
+      : this.currentModelId;
   }
 
   public getPromptTier(): PromptTier {

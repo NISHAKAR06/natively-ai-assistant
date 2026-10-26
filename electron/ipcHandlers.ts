@@ -14792,6 +14792,7 @@ export function initializeIpcHandlers(appState: AppState): void {
       const legacyProviders = cm.getCustomProviders() || [];
       const allProviders = [...curlProviders, ...legacyProviders];
 
+      cm.setDefaultModel(modelId);
       llmHelper.setModel(modelId, allProviders);
 
       // If the user just selected a local Ollama model, warm + pin it now (off the
