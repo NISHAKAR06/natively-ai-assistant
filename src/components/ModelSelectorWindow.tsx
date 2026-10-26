@@ -172,7 +172,7 @@ const ModelSelectorWindow = () => {
 
                 // Cloud Models — standard models + unique preferred models
                 for (const [prov, cfg] of Object.entries(STANDARD_CLOUD_MODELS)) {
-                    if (!cfg.hasKeyCheck(creds)) continue;
+                    if (!cfg.hasKeyCheck(creds) && prov !== 'gemini') continue;
                     cfg.ids.forEach((id, i) => {
                         models.push({ id, name: cfg.names[i], type: 'cloud', provider: prov });
                     });

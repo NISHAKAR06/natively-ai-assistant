@@ -1188,19 +1188,9 @@ export class CredentialsManager {
             return `ollama-${process.env.OLLAMA_MODEL || 'qwen2.5-coder:7b'}`;
         }
         if (this.credentials.defaultModel) {
-            if (!this.credentials.defaultModel.startsWith('ollama-') && !this.hasAnyCloudKey()) {
-                return `ollama-${process.env.OLLAMA_MODEL || 'qwen2.5-coder:7b'}`;
-            }
             return this.credentials.defaultModel;
         }
-        if (!this.hasAnyCloudKey()) {
-            return `ollama-${process.env.OLLAMA_MODEL || 'qwen2.5-coder:7b'}`;
-        }
-        // Default to Flash-Lite: ~0.65s first-token vs ~2.3s for full Flash on
-        // the same prompt (measured), and faster output streaming — the
-        // Cluely-class interactive latency target. Full Flash / Pro remain
-        // user-selectable for harder problems.
-        return 'gemini-3.1-flash-lite';
+        return 'gemini-3.8-flash';
     }
 
     /**

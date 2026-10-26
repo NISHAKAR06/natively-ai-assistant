@@ -2968,6 +2968,7 @@ export class LLMHelper {
     // Update specific model props if needed
     if (targetModelId === GEMINI_PRO_MODEL) this.geminiModel = GEMINI_PRO_MODEL;
     if (targetModelId === GEMINI_FLASH_MODEL) this.geminiModel = GEMINI_FLASH_MODEL;
+    if (targetModelId === GEMINI_FLASH_LITE_MODEL) this.geminiModel = GEMINI_FLASH_LITE_MODEL;
 
     console.log(`[LLMHelper] Switched to Model: ${targetModelId}`);
     // Keep OpenRouter's "which models read images" answers current (2026-10-01).
@@ -3558,7 +3559,8 @@ export class LLMHelper {
    * panel that is merely asking.
    */
   public async scopeFallbackAvailable(needsVision = false): Promise<boolean> {
-    return this.useOllama && await this.checkOllamaAvailable(needsVision);
+    if (this.isProviderDisabled('ollama')) return false;
+    return await this.checkOllamaAvailable(needsVision);
   }
 
   private selectPreferredOllamaModel(availableModels: string[]): string {
@@ -3665,7 +3667,7 @@ export class LLMHelper {
    * the user did not choose is never probed. Cached after the first answer.
    */
   private async resolveLocalVisionModel(): Promise<string | null> {
-    if (!this.useOllama || this.isProviderDisabled('ollama')) return null;
+    if (this.isProviderDisabled('ollama')) return null;
     return this.resolveOllamaVisionModelForChain(OLLAMA_LOCAL_VISION_PROBE_BUDGET_MS);
   }
 
@@ -3682,7 +3684,7 @@ export class LLMHelper {
 
   /** What the last resolve found, without touching the daemon (the registry is synchronous). */
   public getOllamaRecordTarget(): { model: string; url: string } | null {
-    if (!this.useOllama || this.isProviderDisabled('ollama') || !this.ollamaVisionModel) return null;
+    if (this.isProviderDisabled('ollama') || !this.ollamaVisionModel) return null;
     return { model: this.ollamaVisionModel, url: this.ollamaUrl };
   }
 
@@ -9304,8 +9306,8 @@ let isMultimodal = !!(imagePaths?.length);
     // daemon cost 5s on every screenshot.
     // Not when Ollama is switched off in Settings: selected-but-disabled must
     // not receive the screenshot (streamWithOllama has no such check).
-    const ollamaUsable = this.useOllama && !this.isProviderDisabled('ollama');
-    let ollamaVisionModel = ollamaUsable ? this.ollamaVisionModel : null;
+    const ollamaUsable = !this.isProviderDisabled('ollama');
+    let ollamaVisionModel = this.ollamaVisionModel;
     if (ollamaUsable && !ollamaVisionModel) {
       try {
         ollamaVisionModel = await this.resolveOllamaVisionModelForChain();
@@ -11872,7 +11874,52 @@ let isMultimodal = !!(imagePaths?.length);
           return;
         }
         console.warn('[LLMHelper] Gemini cascade failed pre-commit — falling through to next provider:', e?.message || e);
+        if (!this.isProviderDisabled('ollama')) {
+          try {
+            const ollamaReady = await this.ensureOllamaModelSelected(false);
+            if (ollamaReady && this.ollamaModel) {
+              console.log('[LLMHelper] Gemini cascade failed, falling back to Ollama:', this.ollamaModel);
+              const ollamaSystemPrompt = this.resolveLocalSystemPrompt(finalSystemPrompt);
+              yield* this.trackCommit(
+                this.streamWithOllama(
+                  contextOsGoverningBlock ? userContent : message,
+                  contextOsGoverningBlock ? undefined : combinedContext || undefined,
+                  ollamaSystemPrompt,
+                  imagePaths,
+                  abortSignal,
+                  this.ollamaModel
+                ),
+                commit
+              );
+              return;
+            }
+          } catch (ollamaErr: any) {
+            console.warn('[LLMHelper] Ollama fallback failed after Gemini error:', ollamaErr?.message || ollamaErr);
+          }
+        }
         // fall through to the Natively last-resort below
+      }
+    } else if (this.isGeminiModel(this.currentModelId) && !this.isProviderDisabled('ollama')) {
+      try {
+        const ollamaReady = await this.ensureOllamaModelSelected(false);
+        if (ollamaReady && this.ollamaModel) {
+          console.log('[LLMHelper] Gemini selected but client not initialized, falling back to Ollama:', this.ollamaModel);
+          const ollamaSystemPrompt = this.resolveLocalSystemPrompt(finalSystemPrompt);
+          yield* this.trackCommit(
+            this.streamWithOllama(
+              contextOsGoverningBlock ? userContent : message,
+              contextOsGoverningBlock ? undefined : combinedContext || undefined,
+              ollamaSystemPrompt,
+              imagePaths,
+              abortSignal,
+              this.ollamaModel
+            ),
+            commit
+          );
+          return;
+        }
+      } catch (ollamaErr: any) {
+        console.warn('[LLMHelper] Ollama fallback failed when Gemini uninitialized:', ollamaErr?.message || ollamaErr);
       }
     }
 
@@ -11943,12 +11990,21 @@ let isMultimodal = !!(imagePaths?.length);
       }
     }
 
-    if (!this.useOllama && this.ollamaModel) {
-      console.log('[LLMHelper] No cloud provider available in _streamChatInner, falling back to Ollama:', this.ollamaModel);
-      this.useOllama = true;
-      const ollamaSystemPrompt = this.resolveLocalSystemPrompt(finalSystemPrompt);
-      yield* this.streamWithOllama(contextOsGoverningBlock ? userContent : message, contextOsGoverningBlock ? undefined : combinedContext || undefined, ollamaSystemPrompt, imagePaths, abortSignal);
-      return;
+    if (!this.useOllama && !this.isProviderDisabled('ollama')) {
+      const ollamaReady = await this.ensureOllamaModelSelected(false);
+      if (ollamaReady && this.ollamaModel) {
+        console.log('[LLMHelper] No cloud provider available in _streamChatInner, falling back to Ollama:', this.ollamaModel);
+        const ollamaSystemPrompt = this.resolveLocalSystemPrompt(finalSystemPrompt);
+        yield* this.streamWithOllama(
+          contextOsGoverningBlock ? userContent : message,
+          contextOsGoverningBlock ? undefined : combinedContext || undefined,
+          ollamaSystemPrompt,
+          imagePaths,
+          abortSignal,
+          this.ollamaModel
+        );
+        return;
+      }
     }
 
     throw new Error(this.noProviderAvailableMessage());
@@ -14176,7 +14232,7 @@ let isMultimodal = !!(imagePaths?.length);
    * ollamaVisionModel for the next screenshot.
    */
   private async resolveOllamaVisionModelForChain(budgetMs: number = OLLAMA_VISION_CHAIN_PROBE_BUDGET_MS): Promise<string | null> {
-    if (!this.useOllama) return null;
+    if (this.isProviderDisabled('ollama')) return null;
     if (this.ollamaVisionModel && this.ollamaVisionCache.get(this.ollamaVisionModel) !== false) return this.ollamaVisionModel;
     if (this.ollamaVisionModel && this.ollamaVisionCache.get(this.ollamaVisionModel) === false) this.ollamaVisionModel = null;
     if (Date.now() < this.ollamaVisionNegativeUntil) return null;
@@ -14206,7 +14262,7 @@ let isMultimodal = !!(imagePaths?.length);
   public async refreshOllamaVisionModel(): Promise<string | null> {
     if (this.ollamaVisionRefreshInFlight) return this.ollamaVisionRefreshInFlight;
     const run = (async (): Promise<string | null> => {
-      if (!this.useOllama) { this.ollamaVisionModel = null; return null; }
+      if (this.isProviderDisabled('ollama')) { this.ollamaVisionModel = null; return null; }
       try {
         const models = await this.getOllamaModels();
         if (models.length === 0) { this.ollamaVisionModel = null; return null; }

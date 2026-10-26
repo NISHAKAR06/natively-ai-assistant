@@ -14234,17 +14234,33 @@ export function initializeIpcHandlers(appState: AppState): void {
         let response;
 
         if (provider === 'gemini') {
-          const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent`;
-          response = await axios.post(
-            url,
-            {
-              contents: [{ parts: [{ text: 'Hello' }] }],
-            },
-            {
-              headers: { 'x-goog-api-key': apiKey },
-              timeout: 15000,
-            },
-          );
+          const candidates = ['gemini-3.8-flash', 'gemini-3.1-flash-lite', 'gemini-2.5-flash'];
+          let lastErr: any = null;
+          let ok = false;
+          for (const cand of candidates) {
+            try {
+              const url = `https://generativelanguage.googleapis.com/v1beta/models/${cand}:generateContent`;
+              response = await axios.post(
+                url,
+                {
+                  contents: [{ parts: [{ text: 'Hello' }] }],
+                },
+                {
+                  headers: { 'x-goog-api-key': apiKey },
+                  timeout: 15000,
+                },
+              );
+              ok = true;
+              break;
+            } catch (err: any) {
+              lastErr = err;
+              if (err?.response?.status === 404) {
+                continue;
+              }
+              throw err;
+            }
+          }
+          if (!ok && lastErr) throw lastErr;
         } else if (provider === 'groq') {
           // Walk the ladder instead of pinning one id. The preferred Groq model
           // is PREVIEW tier and Groq discontinues preview models without notice —

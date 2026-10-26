@@ -4024,7 +4024,8 @@ export const AIProvidersSettings: React.FC<AIProvidersSettingsProps> = ({
         }
 
         for (const [prov, cfg] of Object.entries(STANDARD_CLOUD_MODELS)) {
-            if (!hasStoredKey[prov as keyof typeof hasStoredKey]) continue;
+            const isGeminiMain = prov === 'gemini';
+            if (!hasStoredKey[prov as keyof typeof hasStoredKey] && !isGeminiMain) continue;
             if (!isProviderEnabled(prov)) continue;
             // Every allow-listed model reaches the picker — not just the preferred one.
             // Previously `preferredModels[prov]` was the ONLY bridge for a non-preset
@@ -5329,6 +5330,24 @@ export const AIProvidersSettings: React.FC<AIProvidersSettingsProps> = ({
                     />
                 </div>
 
+            {/* Main & Fallback Architecture Status */}
+            <div className="aip-card p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 bg-gradient-to-r from-blue-500/10 via-purple-500/10 to-transparent border border-blue-500/20 rounded-xl">
+                <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                        <span className="text-xs font-semibold text-blue-400 uppercase tracking-wider">{t('Engine Architecture')}</span>
+                        <AipBadge tone="ok" label={t('Gemini Main • Ollama Fallback')} />
+                    </div>
+                    <p className="text-xs aip-muted">
+                        {t('Google Gemini powers primary text and multimodal vision. If offline or rate-limited, requests automatically fall back to local Ollama (image + text).')}
+                    </p>
+                </div>
+                <div className="flex items-center gap-2 text-xs font-medium">
+                    <span className="px-2 py-1 rounded bg-black/30 border border-white/10 text-slate-300">
+                        {localFallback.text || localFallback.vision ? `Ollama: ${ollamaStatus === 'detected' ? t('Ready') : t('Checking')}` : t('Ollama: Standby')}
+                    </span>
+                </div>
+            </div>
+
             <div className="aip-card p-5 flex items-center justify-between gap-4">
                     <div className="min-w-0">
                         <label className="block text-xs font-medium uppercase tracking-wide mb-0 aip-hero">{t('Background Model')}</label>
@@ -5659,20 +5678,27 @@ export const AIProvidersSettings: React.FC<AIProvidersSettingsProps> = ({
                                 savingStatus={!!savingStatus[id]}
                                 savedStatus={!!savedStatus[id]}
                                 onPreferredModelChange={(model) => setPreferredModels(prev => ({ ...prev, [id]: model }))}
-                                extraControls={id !== 'fluxion' || !hasStoredKey.fluxion ? undefined : (
-                                    /* One muted line, not a label + two buttons + a hint.
-                                       The protocol is DETECTED from the key's group on save
-                                       (see detectFluxionProtocol), so there is nothing here
-                                       for the user to decide — this only reports what was
-                                       found, the way a resolved value should. */
-                                    <div className="aip-provider-row">
-                                        <span className="text-[11px] aip-muted">
-                                            {t('API format')}: {fluxionProtocol === 'anthropic' ? t('Anthropic') : t('OpenAI')}
-                                            {' · '}
-                                            {t('detected from your key')}
-                                        </span>
-                                    </div>
-                                )}
+                                extraControls={
+                                    id === 'fluxion' && hasStoredKey.fluxion ? (
+                                        /* One muted line, not a label + two buttons + a hint.
+                                           The protocol is DETECTED from the key's group on save
+                                           (see detectFluxionProtocol), so there is nothing here
+                                           for the user to decide — this only reports what was
+                                           found, the way a resolved value should. */
+                                        <div className="aip-provider-row">
+                                            <span className="text-[11px] aip-muted">
+                                                {t('API format')}: {fluxionProtocol === 'anthropic' ? t('Anthropic') : t('OpenAI')}
+                                                {' · '}
+                                                {t('detected from your key')}
+                                            </span>
+                                        </div>
+                                    ) : id === 'gemini' ? (
+                                        <div className="aip-provider-row text-[11px] aip-muted flex items-center justify-between">
+                                            <span>{t('Main Provider: Text & Vision')}</span>
+                                            <span className="text-emerald-400 font-medium">{t('Auto-Fallback: Ollama (Local)')}</span>
+                                        </div>
+                                    ) : undefined
+                                }
                             />
                         );
                     })}
