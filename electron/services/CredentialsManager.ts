@@ -1181,14 +1181,11 @@ export class CredentialsManager {
     }
 
     public getDefaultModel(): string {
-        if (process.env.USE_OLLAMA === 'true') {
-            if (this.credentials.defaultModel && this.credentials.defaultModel.startsWith('ollama-')) {
-                return this.credentials.defaultModel;
-            }
-            return `ollama-${process.env.OLLAMA_MODEL || 'qwen2.5-coder:7b'}`;
-        }
         if (this.credentials.defaultModel) {
             return this.credentials.defaultModel;
+        }
+        if (process.env.USE_OLLAMA === 'true') {
+            return `ollama-${process.env.OLLAMA_MODEL || 'qwen2.5-coder:7b'}`;
         }
         return 'gemini-3.8-flash';
     }

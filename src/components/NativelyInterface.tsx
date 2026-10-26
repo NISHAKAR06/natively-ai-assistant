@@ -409,7 +409,7 @@ import {
 } from '../lib/overlayAppearance';
 import { NegotiationCoachingCard } from '../premium';
 import type { DynamicActionPayload } from '../types/electron';
-import { getCodexCliModelDisplayName, gatewayModelLabel, litellmModelLabel } from '../utils/modelUtils';
+import { getCodexCliModelDisplayName, gatewayModelLabel, litellmModelLabel, prettifyModelId } from '../utils/modelUtils';
 import { getModifierSymbol, isMac, isWindows } from '../utils/platformUtils';
 import { acceleratorToKeys } from '../utils/keyboardUtils';
 import { DynamicActionBar } from './dynamic-actions/DynamicActionBar';
@@ -12537,9 +12537,14 @@ Provide only the answer, nothing else.`;
                           if (m === 'openai/gpt-oss-20b') return 'Groq GPT-OSS 20B';
                           if (m === 'gpt-5.4') return 'GPT 5.4';
                           if (m === 'claude-sonnet-4-6') return 'Sonnet 4.6';
+                          if (m === 'deepseek-flash') return 'DeepSeek V4.1 Flash';
                           // Retired 2026-09-10; DeepSeek serves it as deepseek-flash (V4.1).
                           if (m === 'deepseek-v4-flash') return 'DeepSeek V4.1 Flash';
-                          return m;
+                          if (m === 'deepseek-v4-pro') return 'DeepSeek V4 Pro';
+                          if (m.startsWith('openrouter/')) return gatewayModelLabel(m);
+                          if (m.startsWith('nvidia_nim/')) return gatewayModelLabel(m);
+                          if (m.startsWith('antigravity:')) return m.replace('antigravity:', '');
+                          return prettifyModelId(m);
                         })()}
                       </ModelSelectorLabel>
                       <ChevronDown size={12} className="shrink-0 transition-transform" />

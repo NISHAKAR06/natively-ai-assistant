@@ -2949,7 +2949,18 @@ export class LLMHelper {
     }
 
     // Standard Cloud Models
-    if (process.env.USE_OLLAMA === 'true' && !this.apiKey && !this.openaiApiKey && !this.claudeApiKey && !this.groqApiKey) {
+    if (this.isGeminiModel(targetModelId) && !this.apiKey) {
+      try {
+        const { CredentialsManager } = require('./services/CredentialsManager');
+        const cm = CredentialsManager.getInstance();
+        const gemKey = cm.getGeminiApiKey();
+        if (gemKey) {
+          this.setApiKey(gemKey);
+        }
+      } catch {}
+    }
+
+    if (process.env.USE_OLLAMA === 'true' && !this.apiKey && !this.openaiApiKey && !this.claudeApiKey && !this.groqApiKey && !this.deepseekApiKey && !this.nvidiaNimApiKey && !this.openrouterApiKey) {
       console.warn(`[LLMHelper] USE_OLLAMA is active and no cloud key is configured; preserving Ollama model (${this.ollamaModel})`);
       this.useOllama = true;
       return;

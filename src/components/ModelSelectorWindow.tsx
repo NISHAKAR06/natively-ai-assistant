@@ -286,6 +286,7 @@ const ModelSelectorWindow = () => {
         // Listen for changes
         const unsubscribe = window.electronAPI?.onModelChanged?.((modelId: string) => {
             setCurrentModel(modelId);
+            localStorage.setItem('cached-current-model', modelId);
         });
         // This window is REUSED, never destroyed: ModelSelectorWindowHelper
         // pre-warms it offscreen and thereafter only hide()s and show()s it. So
@@ -340,12 +341,17 @@ const ModelSelectorWindow = () => {
         return () => { cancelled = true; off?.(); };
     }, [visionIdsKey]);
 
-    const handleSelectFn = (modelId: string) => {
+    const handleSelectFn = async (modelId: string) => {
         setCurrentModel(modelId);
         localStorage.setItem('cached-current-model', modelId);
         
-        window.electronAPI?.setModel(modelId)
-            .catch((err: any) => console.error("Failed to set model:", err));
+        try {
+            await window.electronAPI?.setModel(modelId);
+        } catch (err: any) {
+            console.error("Failed to set model:", err);
+        } finally {
+            window.electronAPI?.modelSelectorCloseIfOpen?.()?.catch?.(() => {});
+        }
     };
 
     // The empty list's one row. A model is added in Settings, so go there and
@@ -443,7 +449,14 @@ const ModelSelectorWindow = () => {
     // The window is pre-warmed once and then only hidden and shown, so a mount
     // animation would play a single time, offscreen. Main says when it opens.
     useEffect(() => {
-        const unsubscribe = window.electronAPI?.onModelSelectorShown?.(() => {
+        const unsubscribe = window.electronAPI?.onModelSelectorShown?.(async () => {
+            try {
+                const config = await window.electronAPI?.getCurrentLlmConfig?.();
+                if (config && config.modelId) {
+                    setCurrentModel(config.modelId);
+                    localStorage.setItem('cached-current-model', config.modelId);
+                }
+            } catch {}
             revealSelected();
             const panel = panelRef.current;
             if (!panel || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
