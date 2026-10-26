@@ -2012,7 +2012,7 @@ export function ProfileIntelligenceSettings({
     // closes this panel), and the licence is read again on the next mount.
     const openPlans = () => onOpenNativelyAPI?.();
     const [licenseLoaded, setLicenseLoaded] = useState(true);
-    const hasProfileAccess = true;
+    const hasProfileAccess = isPremium || isTrialActive;
     const theme = useResolvedTheme();
     /* The CTA's Liquid Glass lens. Shared with LiquidGlassButton so the rAF
        gate and the focus-clears-the-pointer rule have one implementation. */
