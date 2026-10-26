@@ -7989,6 +7989,52 @@ export function initializeIpcHandlers(appState: AppState): void {
       );
     }
 
+    if (!resolvedSkill.skill && (!request.imagePaths || request.imagePaths.length === 0) && typeof resolvedSkill.currentRequest === 'string') {
+      const { resolveUnambiguousAssistantProbe, resolveGreetingProbe } = require('./llm/manualIdentityRouting') as typeof import('./llm/manualIdentityRouting');
+      const greetingReply = resolveGreetingProbe(resolvedSkill.currentRequest);
+      const identityReply = resolveUnambiguousAssistantProbe(resolvedSkill.currentRequest) ?? greetingReply;
+      if (identityReply) {
+        sendDirectAssistEvent(event.sender, {
+          type: 'start',
+          requestId: request.requestId,
+        });
+        sendDirectAssistEvent(event.sender, {
+          type: 'delta',
+          requestId: request.requestId,
+          sequence: 1,
+          text: identityReply,
+        });
+        sendDirectAssistEvent(event.sender, {
+          type: 'done',
+          requestId: request.requestId,
+          sequence: 2,
+          fullText: identityReply,
+        });
+        try {
+          const im = appState.getIntelligenceManager?.();
+          if (im) {
+            im.addTranscript?.({
+              text: String(resolvedSkill.currentRequest || ''),
+              speaker: 'user',
+              timestamp: Date.now(),
+              final: true,
+              origin: 'manual_chat',
+            }, true);
+            im.addAssistantMessage?.(identityReply, undefined, 'manual_chat');
+            im.pushUsage?.({
+              type: 'assist',
+              timestamp: Date.now(),
+              question: String(resolvedSkill.currentRequest || ''),
+              answer: identityReply,
+              source: 'direct_assist',
+              synthetic: true,
+            });
+          }
+        } catch { /* ignore usage recording error */ }
+        return { accepted: true, requestId: request.requestId };
+      }
+    }
+
     const senderId = Number(event.sender?.id);
     if (!Number.isFinite(senderId)) {
       return rejectDirectAssist(
