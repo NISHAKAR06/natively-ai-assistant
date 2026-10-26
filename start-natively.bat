@@ -8,7 +8,7 @@ if /I "%~1"=="stop" (
 set ELECTRON_RUN_AS_NODE=
 set NODE_ENV=production
 set NATIVELY_CORE_SMOKE=1
-set USE_OLLAMA=true
-set OLLAMA_MODEL=qwen2.5-coder:7b
+if not defined USE_OLLAMA set USE_OLLAMA=true
+if not defined OLLAMA_MODEL set OLLAMA_MODEL=qwen2.5-coder:7b
 start "" /D "%APP_DIR%" "%APP_DIR%\node_modules\electron\dist\electron.exe" "%APP_DIR%"
 echo Natively launched in standalone background mode (100% free local AI + STT).

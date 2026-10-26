@@ -8,7 +8,7 @@
   "description": "Natively is a meeting notes app that uses AI to generate notes from your meetings.",
   "scripts": {
     "clean": "rimraf dist dist-electron",
-    "dev": "vite",
+    "dev": "vite --clearScreen false",
     "build": "npm run clean && node node_modules/typescript7/lib/tsc.js -p tsconfig.json && vite build && npm run build:electron",
     "build:electron": "node scripts/build-electron.js",
     "build:electron:core-smoke": "cross-env NATIVELY_CORE_SMOKE=1 node scripts/build-electron.js",
