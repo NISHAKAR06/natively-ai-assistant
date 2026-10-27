@@ -17997,11 +17997,12 @@ export function initializeIpcHandlers(appState: AppState): void {
 
   safeHandle('set-tavily-api-key', async (_, apiKey: string) => {
     try {
-      if (apiKey && !apiKey.startsWith('tvly-')) {
+      const trimmed = typeof apiKey === 'string' ? apiKey.trim() : '';
+      if (trimmed && !trimmed.startsWith('tvly-')) {
         return { success: false, error: 'Invalid Tavily API key. Keys must start with "tvly-".' };
       }
       const { CredentialsManager } = require('./services/CredentialsManager');
-      CredentialsManager.getInstance().setTavilyApiKey(apiKey);
+      CredentialsManager.getInstance().setTavilyApiKey(trimmed);
       return { success: true };
     } catch (error: any) {
       return { success: false, error: error.message };

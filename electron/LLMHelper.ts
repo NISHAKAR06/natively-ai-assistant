@@ -10137,6 +10137,25 @@ let isMultimodal = !!(imagePaths?.length);
       }
     }
 
+    // Tavily Web Search integration for interview & technical concept questions:
+    if (!v3OwnedTurn && !profileInjectionAllowed && typeof message === 'string' && message.trim().length > 3) {
+      try {
+        const isCandidateQuery = /(tell (me )?about (my|your) (experience|background|projects?|work|career)|tell me about yourself|who (am i|are you)|walk me through (my|your) (resume|background|cv)|what is (my|your) (experience|background)|what are (my|your) (skills|strengths|weaknesses)|what projects have (i|you) worked on|why should we hire you|my projects?|my resume)/i.test(message);
+        if (!isCandidateQuery) {
+          const { TavilySearchService } = require('./services/TavilySearchService');
+          const tavily = TavilySearchService.getInstance();
+          if (tavily.hasApiKey()) {
+            const tavilyRes = await tavily.searchForInterview(message, 2500);
+            if (tavilyRes?.formattedResearch) {
+              context = context ? `${tavilyRes.formattedResearch}\n\n${context}` : tavilyRes.formattedResearch;
+            }
+          }
+        }
+      } catch (tavilyErr: any) {
+        console.warn('[LLMHelper] Tavily search skipped or failed:', tavilyErr?.message || tavilyErr);
+      }
+    }
+
     // ============================================================
     // ACTIVE MODE INJECTION (Context + System Prompt Suffix)
     // Skipped for UNIVERSAL_* callers — those prompts have their own

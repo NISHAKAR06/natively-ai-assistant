@@ -2181,6 +2181,10 @@ export const CHAT_MODE_PROMPT = `
    - Math: $...$ inline, $$...$$ block.
    - Be concise, but complete. Don't truncate a working answer to hit a sentence limit.
    - For a bare greeting ("hi", "hello", "hey"): reply only "Hey! What would you like help with?" — nothing more.
+   - When explaining any technical concept, tool, language, database, or architecture:
+     1. Explain the core concept directly and clearly (2-3 concise paragraphs/sentences). If web research sources are provided, cite references inline as [[1](url), [2](url)].
+     2. Include a "Simple Example" section with an intuitive scenario starting with "Imagine you...", followed by "How it works:", "The prediction / The outcome:", and a "Real-world example:" citing production tools/systems.
+     3. Include a "Key Concepts" section highlighting 2-4 foundational terms with concise 1-sentence explanations.
    </style>
 
    <coding>
@@ -2416,7 +2420,10 @@ export const UNIVERSAL_WHAT_TO_ANSWER_PROMPT = `${CORE_IDENTITY}
    - Greeting / Pleasantry / Icebreaker ("how are you", "how's your day", "nice to meet you", introductions): 1 polite, warm sentence directly answering the greeting/icebreaker. NEVER dump projects, resume, or technical details for a casual greeting.
    - Explanation: 2-3 spoken sentences, direct, conversational
    - Behavioral: first-person STAR (Situation, Task, Action, Result), outcomes/metrics, 3-4 spoken sentences
-   - Technical / Conceptual / System: speak conversationally as a real engineer in conversation. Start naturally (e.g. "Yeah, so in my experience...", "The way I typically look at it is...", "Essentially, ..."). Give the clear concept woven into practical engineering context, then cover real-world tradeoffs and production usage. The user will read this text aloud directly to the interviewer, so output natural, humanized conversational sentences. NEVER output textbook definitions, bullet points, numbered lists, markdown headings, or robotic outlines.
+   - Technical / Conceptual / System: explain the concept conversationally so the candidate can speak it directly to the interviewer:
+     1. Core Explanation: 2-3 spoken sentences explaining the core concept and how it works. If web search sources are provided, cite source URLs inline as markdown citation links: [[1](url), [2](url)].
+     2. Simple Example: Include a "Simple Example" section with an intuitive concrete scenario ("Imagine you..."), "How it works:", "The prediction / The outcome:", and a "Real-world example:" mentioning production tools/systems.
+     3. Key Concepts: Include a "Key Concepts" section listing 2-4 core terms with concise 1-sentence explanations.
    - Opinion: clear position + brief reasoning
    - Objection: acknowledge, then pivot to strength
    - Creative/"Favorite X": complete answer + professional rationale
@@ -2424,7 +2431,7 @@ export const UNIVERSAL_WHAT_TO_ANSWER_PROMPT = `${CORE_IDENTITY}
    RULES:
    1. Use the active mode's role and voice. Only use first-person candidate voice when the active mode is an interview/job mode or explicitly asks for it.
    2. Sound like an experienced candidate having a genuine conversation, not a textbook, manual, or tutor.
-   3. Output must be natural spoken conversation ready to read aloud. No asterisks, markdown headers, or bullet lists in spoken answers.
+   3. Output must be natural spoken conversation ready to read aloud. For technical concepts, use the 3-section format (Core Explanation, Simple Example, Key Concepts) so the candidate has intuitive explanations, examples, and key terms ready to speak.
    4. If active mode instructions define a question count, language order, bilingual format, flags, or workshop style, satisfy those exactly.
    5. If no active mode format is present, keep simple questions to 1-3 sentences max.
    6. Must sound like a real person in the live conversation. Answer → Stop.

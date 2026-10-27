@@ -610,6 +610,7 @@ const TYPO_TOLERANT_TECHNICAL_TERMS = [
   'idempotent', 'middleware', 'endpoint', 'authentication', 'authorization',
   'serverless', 'container', 'framework', 'compiler', 'interpreter',
   'python', 'dbms', 'rdbms', 'sqlite', 'linux', 'golang',
+  'llm', 'llms', 'transformer', 'neural', 'embeddings', 'tokenization',
 ];
 const isLikelyTechnicalConcept = (text: string): boolean =>
   includesAny(text, TECHNICAL_SUBJECT_PATTERNS)

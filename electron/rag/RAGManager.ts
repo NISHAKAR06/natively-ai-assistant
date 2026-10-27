@@ -454,8 +454,8 @@ Generate a cohesive, highly articulate, confident first-person interview answer:
             }
         }
 
-        // 3. General Cross-Meeting & Profile Retrieval
-        const [context, profileResult] = await Promise.all([
+        // 3. General Cross-Meeting, Profile Retrieval & Live Web Research (Tavily)
+        const [context, profileResult, webResearch] = await Promise.all([
             this.retriever.retrieveGlobal(query, { queryEmbedRetryBudgetMs: 1500 }).catch(err => {
                 console.warn('[RAGManager] retrieveGlobal error (non-fatal):', err?.message || err);
                 return { chunks: [], formattedContext: '', totalTokens: 0, meetingIds: [], intent: 'open_question' as const };
@@ -476,12 +476,31 @@ Generate a cohesive, highly articulate, confident first-person interview answer:
                     console.warn('[RAGManager] Could not retrieve candidate profile facts:', e?.message || e);
                 }
                 return null;
+            })(),
+            (async () => {
+                // For general technical or interview concept questions, query Tavily for real-world web research
+                if (isCandidateQuery) return null;
+                try {
+                    const { TavilySearchService } = require('../services/TavilySearchService');
+                    const tavily = TavilySearchService.getInstance();
+                    if (tavily.hasApiKey()) {
+                        return await tavily.searchForInterview(query, 2500);
+                    }
+                } catch (e: any) {
+                    console.warn('[RAGManager] Tavily interview search error (non-fatal):', e?.message || e);
+                }
+                return null;
             })()
         ]);
 
         let profileContext = '';
         if (profileResult?.relevantFacts) {
             profileContext = `CANDIDATE RESUME & PROFILE FACTS:\n${profileResult.relevantFacts}`;
+        }
+
+        let webContext = '';
+        if (webResearch?.formattedResearch) {
+            webContext = webResearch.formattedResearch;
         }
 
         // Filter out profile chunks from meeting search so meetings and profile never cross-contaminate
@@ -497,12 +516,13 @@ Generate a cohesive, highly articulate, confident first-person interview answer:
             .join('\n\n');
 
         let formatted = '';
-        if (profileContext && cleanMeetingContext) {
-            formatted = `${profileContext}\n\nMEETING DISCUSSIONS & NOTES:\n${cleanMeetingContext}`;
-        } else if (profileContext) {
-            formatted = profileContext;
-        } else if (cleanMeetingContext) {
-            formatted = cleanMeetingContext;
+        const contextParts: string[] = [];
+        if (webContext) contextParts.push(webContext);
+        if (profileContext) contextParts.push(profileContext);
+        if (cleanMeetingContext) contextParts.push(`MEETING DISCUSSIONS & NOTES:\n${cleanMeetingContext}`);
+
+        if (contextParts.length > 0) {
+            formatted = contextParts.join('\n\n');
         } else {
             formatted = `(No matching excerpts were found across the user's meetings for this question.)\n${NO_GLOBAL_CONTEXT_FALLBACK}`;
         }

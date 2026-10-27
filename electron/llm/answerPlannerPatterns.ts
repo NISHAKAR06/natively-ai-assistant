@@ -33,6 +33,7 @@ const TECHNICAL_SUBJECT_PATTERNS = [
   /\b(aws|ec2|s3|lambda|azure|gcp|kubernetes|docker|redis|kafka)\b/i,
   /\b(indexing|pandas|numpy|spark|hadoop|etl|dataframe)\b/i,
   /\b(a\/b test|ab test|retention|cohort|regression|classification|clustering)\b/i,
+  /\b(llm|llms|large language models?|neural networks?|deep learning|machine learning|transformers?|attention mechanism|self[- ]?attention|fine[- ]?tuning|rag|retrieval augmented generation|generative ai|genai|nlp|natural language processing|embeddings?|tokenization|tokens?|parameters?|weights?|prompt engineering)\b/i,
 ];
 
 export // CI/CD and related devops terms (live-confirmed leak, 2026-07-27): "what is

@@ -1225,6 +1225,52 @@ The user triggered this action with a coding problem on screen and NO new questi
                 user: _wtaUserMessage,
                 extra: { v3Sections: _v3p?.sections ?? null, activeSkill: activeSkill?.id ?? null, hasImages: hasAttachedImages },
             });
+
+            // ── TAVILY SEARCH INTEGRATION FOR INTERVIEWS ──
+            const resolvedQuestionText = (answerPlan?.question || '').trim();
+            const isCandidateSelfQuery = /(tell (me )?about (my|your) (experience|background|projects?|work|career)|tell me about yourself|who (am i|are you)|walk me through (my|your) (resume|background|cv)|what is (my|your) (experience|background)|what are (my|your) (skills|strengths|weaknesses)|what projects have (i|you) worked on|why should we hire you|my projects?|my resume)/i.test(resolvedQuestionText);
+            const isTechnicalOrConceptual = !isCandidateSelfQuery && (
+                answerPlan?.answerType === 'technical_concept_answer' ||
+                answerPlan?.answerType === 'general_meeting_answer' ||
+                (!candidateProfile && resolvedQuestionText.length > 5)
+            );
+
+            let webResearchBlock = '';
+            if (isTechnicalOrConceptual && resolvedQuestionText) {
+                try {
+                    const { TavilySearchService } = require('../services/TavilySearchService');
+                    const tavily = TavilySearchService.getInstance();
+                    if (tavily.hasApiKey()) {
+                        const tavilyRes = await tavily.searchForInterview(resolvedQuestionText, 2500);
+                        if (tavilyRes?.formattedResearch) {
+                            webResearchBlock = tavilyRes.formattedResearch;
+                        }
+                    }
+                } catch (tavilyErr: any) {
+                    console.warn('[WhatToAnswerLLM] Tavily search error (non-fatal):', tavilyErr?.message || tavilyErr);
+                }
+            }
+
+            // If web research was fetched, prepend it to user message
+            let _effectiveUserMessage = _wtaUserMessage;
+            if (webResearchBlock) {
+                _effectiveUserMessage = `${webResearchBlock}\n\n${_wtaUserMessage}`;
+            }
+
+            // When explaining technical concepts in interview, instruct the 3-section format
+            if (isTechnicalOrConceptual) {
+                _wtaSystemPrompt = `${_wtaSystemPrompt}\n\n## RESPONSE STRUCTURE FOR TECHNICAL CONCEPT QUESTIONS:
+When explaining a technical concept, language, framework, database, AI/ML topic, or system design in an interview:
+1. Core Explanation: Start immediately with a clear, authoritative explanation in 2-3 spoken sentences. If web research sources are provided above, cite source URLs inline as markdown citation links: [[1](url), [2](url)].
+2. Simple Example: Include a section titled "Simple Example" with:
+   - Scenario starting with "Imagine you..."
+   - "How it works:": Brief, clear intuition of what happens behind the scenes.
+   - "The prediction / The outcome:": Expected result.
+   - "Real-world example:": Mentioning real production tools, databases, or systems (e.g. ChatGPT, Gemini, PostgreSQL, Docker, Redis, Kubernetes) and how they apply this.
+   - Inline citation links [[1](url)] where applicable.
+3. Key Concepts: Include a section titled "Key Concepts" listing 2-4 core terms with concise 1-sentence explanations and citations.`;
+            }
+
             // Prefer the outcome-bearing API so a truncated answer can be kept
             // out of session history. Fourteen existing suites inject a test
             // double that implements only `streamChat`; those double s degrade
@@ -1243,7 +1289,7 @@ The user triggered this action with a coding problem on screen and NO new questi
             // what exposed it. Typing the tuple as the callee's own parameter list
             // fixes that and additionally checks arity and order against the real
             // signature — which an `as const` tuple silently did not.
-            const _wtaArgs: Parameters<LLMHelper['streamChat']> = [_wtaUserMessage, imagePaths, undefined, _wtaSystemPrompt, true, true, packetScopes, abortSignal, wtaThinkingBudget, _wtaRoute];
+            const _wtaArgs: Parameters<LLMHelper['streamChat']> = [_effectiveUserMessage, imagePaths, undefined, _wtaSystemPrompt, true, true, packetScopes, abortSignal, wtaThinkingBudget, _wtaRoute];
             // Hand this turn's fully-composed answer call to LLMHelper so the
             // post-answer repair passes can reuse it. Because positions 5 and 6
             // are both `true`, everything the answer knows — transcript,

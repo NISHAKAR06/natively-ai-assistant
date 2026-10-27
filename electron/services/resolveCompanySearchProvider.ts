@@ -15,10 +15,17 @@ export function resolveCompanySearchProvider(): SearchProvider | null {
 
   const tavilyApiKey = cm.getTavilyApiKey();
   if (tavilyApiKey) {
-    const {
-      TavilySearchProvider,
-    } = require('../../premium/electron/knowledge/TavilySearchProvider');
-    return new TavilySearchProvider(tavilyApiKey);
+    try {
+      const {
+        TavilySearchProvider,
+      } = require('../../premium/electron/knowledge/TavilySearchProvider');
+      return new TavilySearchProvider(tavilyApiKey);
+    } catch {
+      const {
+        TavilySearchProvider,
+      } = require('./TavilySearchService');
+      return new TavilySearchProvider(tavilyApiKey);
+    }
   }
 
   const nativelyKey = cm.getNativelyApiKey();
