@@ -391,18 +391,27 @@ test('Default Interview Roles (SDE, AI/ML, Tech, General) are seeded and UI prov
   assert.ok(builtinContent.includes("'sde-interview': 'SDE Interview'"), 'builtinModes should have SDE Interview label');
   assert.ok(builtinContent.includes("'aiml-interview': 'AI/ML Interview'"), 'builtinModes should have AI/ML Interview label');
 
-  // 3. Verify ipcHandlers.ts allows setting active interview roles without pro restriction
+  // 3. Verify ipcHandlers.ts allows setting active interview roles without pro restriction and sets modeIdToSet
   const ipcPath = path.join(projectRoot, 'electron', 'ipcHandlers.ts');
   const ipcContent = fs.readFileSync(ipcPath, 'utf-8');
   assert.ok(ipcContent.includes("targetMode.templateType === 'sde-interview'"), 'modes:set-active should allow sde-interview');
   assert.ok(ipcContent.includes("targetMode.templateType === 'aiml-interview'"), 'modes:set-active should allow aiml-interview');
   assert.ok(ipcContent.includes("targetMode.templateType === 'technical-interview'"), 'modes:set-active should allow technical-interview');
+  assert.ok(ipcContent.includes("ModesManager.getInstance().setActiveMode(modeIdToSet)"), 'modes:set-active must activate modeIdToSet');
 
-  // 4. Verify NativelyInterface provides SDE, AIML, Tech roles and prevents top clipping
+  // 4. Verify ModesManager resolves templateType to mode.id automatically
+  const mmPath = path.join(projectRoot, 'electron', 'services', 'ModesManager.ts');
+  const mmContent = fs.readFileSync(mmPath, 'utf-8');
+  assert.ok(mmContent.includes("m.id === id || m.templateType === id"), 'ModesManager.setActiveMode must resolve templateType to mode.id');
+
+  // 5. Verify NativelyInterface provides SDE, AIML, Tech roles, in-flow drawer architecture, and prevents clipping
   const uiPath = path.join(projectRoot, 'src', 'components', 'NativelyInterface.tsx');
   const uiContent = fs.readFileSync(uiPath, 'utf-8');
   assert.ok(uiContent.includes("handleSelectRole('sde-interview')"), 'UI should have SDE role button');
   assert.ok(uiContent.includes("handleSelectRole('aiml-interview')"), 'UI should have AIML role button');
   assert.ok(uiContent.includes("handleSelectRole('technical-interview')"), 'UI should have Technical Interview role button');
-  assert.ok(uiContent.includes("minHeight: (showRoleSelector || showFileMenu) ? 380 : undefined"), 'UI shellRef must expand minHeight when role selector or file menu is open to prevent top clipping');
+  assert.ok(uiContent.includes("resolveRoleSlug"), 'UI should have robust resolveRoleSlug helper');
+  assert.ok(uiContent.includes("data-role-selector-root"), 'UI should render in-flow role selector drawer to prevent clipping');
+  assert.ok(uiContent.includes("data-file-menu-root"), 'UI should render in-flow file menu drawer to prevent clipping');
+  assert.ok(uiContent.includes("minHeight: (showRoleSelector || showFileMenu) ? 380 : undefined"), 'UI shellRef must expand minHeight when role selector or file menu is open');
 });

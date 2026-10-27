@@ -1206,7 +1206,15 @@ export class ModesManager {
             console.warn('[ModesManager] setActiveMode: refusing to activate the reserved profile OKF mode');
             return;
         }
-        DatabaseManager.getInstance().setActiveMode(id);
+        let resolvedId: string | null = id;
+        if (id !== null) {
+            const allModes = this.getModes();
+            const matching = allModes.find(m => m.id === id || m.templateType === id);
+            if (matching) {
+                resolvedId = matching.id;
+            }
+        }
+        DatabaseManager.getInstance().setActiveMode(resolvedId);
         this.invalidateActiveModeCache();
     }
 

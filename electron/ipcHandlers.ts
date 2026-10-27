@@ -18536,7 +18536,7 @@ export function initializeIpcHandlers(appState: AppState): void {
       // depth, not because a live path currently reaches it unguarded.
       try { _manualCodingState.clearAllSessions(); } catch { /* non-fatal */ }
 
-      ModesManager.getInstance().setActiveMode(id);
+      ModesManager.getInstance().setActiveMode(modeIdToSet);
       // Supersede in-flight LIVE answers too (the abort loop above only covers
       // manual chat streams): a WTA generation planned under the old mode must
       // not finalize into a UI now showing the new one.
@@ -18546,7 +18546,7 @@ export function initializeIpcHandlers(appState: AppState): void {
       // sources" at question time — Settings badges were honest, but the
       // surface where the user actually ASKS showed only the mode name, and a
       // mode with zero attached files answered "the résumé doesn't mention it".
-      const activeMode = id ? ModesManager.getInstance().getActiveMode() : null;
+      const activeMode = modeIdToSet ? ModesManager.getInstance().getActiveMode() : null;
       const activeName = activeMode?.name ?? null;
       let fileCount = 0; let indexedCount = 0;
       try {
@@ -18557,7 +18557,7 @@ export function initializeIpcHandlers(appState: AppState): void {
         }
       } catch { /* indicator only */ }
       BrowserWindow.getAllWindows().forEach((win) => {
-        if (!win.isDestroyed()) win.webContents.send('mode-changed', { id, name: activeName, fileCount, indexedCount });
+        if (!win.isDestroyed()) win.webContents.send('mode-changed', { id: modeIdToSet, templateType: activeMode?.templateType ?? (modeIdToSet ? null : 'general'), name: activeName, fileCount, indexedCount });
       });
       // Phase 3 — re-bind dynamic action engine so the new mode's trigger pack
       // takes effect immediately. New (sessionId, modeId) pair flushes the per-

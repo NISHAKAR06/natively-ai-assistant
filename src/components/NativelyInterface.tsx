@@ -1567,24 +1567,62 @@ const NativelyInterface: React.FC<NativelyInterfaceProps> = ({
     });
   };
 
+  const resolveRoleSlug = (track: string | null): 'sde' | 'aiml' | 'technical' | 'general' => {
+    const str = (track || '').toLowerCase();
+    if (str.includes('sde') || str.includes('software')) return 'sde';
+    if (str.includes('aiml') || str.includes('ai') || str.includes('ml')) return 'aiml';
+    if (str.includes('technical') || str.includes('tech')) return 'technical';
+    return 'general';
+  };
+
   useEffect(() => {
     window.electronAPI?.modesGetActive?.().then((mode: any) => {
       setActiveRoleTrack(mode?.templateType || mode?.id || null);
     }).catch(() => {});
 
     const unsub = window.electronAPI?.onModeChanged?.((data: any) => {
-      setActiveRoleTrack(data?.id || null);
+      setActiveRoleTrack(data?.templateType || data?.id || null);
     });
     return () => { unsub?.(); };
   }, []);
 
+  // Dismiss role / file menu on Escape or click outside
+  useEffect(() => {
+    if (!showRoleSelector && !showFileMenu) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setShowRoleSelector(false);
+        setShowFileMenu(false);
+      }
+    };
+    const handleClickOutside = (e: MouseEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (
+        target &&
+        !target.closest('[data-role-selector-root]') &&
+        !target.closest('[data-role-selector-toggle]') &&
+        !target.closest('[data-file-menu-root]') &&
+        !target.closest('[data-file-menu-toggle]')
+      ) {
+        setShowRoleSelector(false);
+        setShowFileMenu(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showRoleSelector, showFileMenu]);
+
   const handleSelectRole = async (roleId: string | null) => {
     setShowRoleSelector(false);
+    setActiveRoleTrack(roleId);
     const api = (window as any).electronAPI;
     if (!api?.modesSetActive) return;
     try {
       await api.modesSetActive(roleId);
-      setActiveRoleTrack(roleId);
     } catch (e) {
       console.error('Error changing active role:', e);
     }
@@ -3351,12 +3389,12 @@ const NativelyInterface: React.FC<NativelyInterfaceProps> = ({
   }, [attachedContext.length, syncStreamingHeightBaseline, adoptAppliedSize]);
 
   useEffect(() => {
-    // When handbook viewer opens or closes, trigger size report so Electron window adapts smoothly
+    // When handbook viewer or in-flow drawers open or close, trigger size report so Electron window adapts smoothly
     const timer = setTimeout(() => {
       reportShellSize();
-    }, 60);
+    }, 40);
     return () => clearTimeout(timer);
-  }, [handbookViewer, reportShellSize]);
+  }, [handbookViewer, showRoleSelector, showFileMenu, reportShellSize]);
 
   // Compute the vertical budget cap for the chat scroll area and push it into
   // the `verticalCap` motion value (which scrollMaxH mins against the
@@ -12655,6 +12693,346 @@ Provide only the answer, nothing else.`;
                   </div>
                 </div>
 
+                {/* IN-FLOW ROLE SELECTOR DRAWER */}
+                <AnimatePresence>
+                  {showRoleSelector && (
+                    <motion.div
+                      data-role-selector-root=""
+                      initial={{ opacity: 0, height: 0, y: 4 }}
+                      animate={{ opacity: 1, height: 'auto', y: 0 }}
+                      exit={{ opacity: 0, height: 0, y: 4 }}
+                      transition={{ duration: 0.16, ease: 'easeOut' }}
+                      className="w-full mt-2 rounded-xl border border-border-muted bg-bg-elevated/95 p-2.5 shadow-2xl backdrop-blur-xl text-text-primary no-drag overflow-hidden"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <div className="flex items-center justify-between px-1 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-text-tertiary mb-2 border-b border-border-muted/40 pb-1.5">
+                        <div className="flex items-center gap-2">
+                          <span className="text-text-primary">Select Interview Role</span>
+                          <span className="text-[9px] lowercase bg-bg-item-surface px-1.5 py-0.5 rounded text-accent-primary font-mono font-normal">
+                            official handbooks & dossier
+                          </span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setShowRoleSelector(false)}
+                          className="p-1 rounded text-text-tertiary hover:text-text-primary hover:bg-bg-item-hover transition-colors cursor-pointer"
+                          title="Close (Esc)"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+                        {/* SDE Role */}
+                        <button
+                          type="button"
+                          onClick={() => void handleSelectRole('sde-interview')}
+                          className={`flex items-start justify-between rounded-lg p-2 text-xs text-left transition-all cursor-pointer ${
+                            resolveRoleSlug(activeRoleTrack) === 'sde'
+                              ? 'bg-cyan-500/15 text-cyan-300 font-medium border border-cyan-500/40 shadow-sm'
+                              : 'bg-bg-item-surface/40 hover:bg-bg-item-hover text-text-primary border border-transparent'
+                          }`}
+                        >
+                          <div className="flex items-start gap-2 min-w-0">
+                            <div className="p-1.5 rounded-md bg-cyan-500/10 text-cyan-400 shrink-0 mt-0.5">
+                              <Code className="w-4 h-4" />
+                            </div>
+                            <div className="min-w-0">
+                              <div className="font-semibold text-xs flex items-center gap-1.5">
+                                <span>SDE Role</span>
+                                <span className="text-[9px] px-1 py-0.2 rounded bg-cyan-500/20 text-cyan-300 font-normal">SDE / Core</span>
+                              </div>
+                              <div className="text-[10px] text-text-tertiary truncate mt-0.5">DSA, System Design, GFG & W3Schools</div>
+                            </div>
+                          </div>
+                          {resolveRoleSlug(activeRoleTrack) === 'sde' && <Check className="w-4 h-4 text-cyan-400 shrink-0 ml-1 mt-0.5" />}
+                        </button>
+
+                        {/* AI / ML Role */}
+                        <button
+                          type="button"
+                          onClick={() => void handleSelectRole('aiml-interview')}
+                          className={`flex items-start justify-between rounded-lg p-2 text-xs text-left transition-all cursor-pointer ${
+                            resolveRoleSlug(activeRoleTrack) === 'aiml'
+                              ? 'bg-purple-500/15 text-purple-300 font-medium border border-purple-500/40 shadow-sm'
+                              : 'bg-bg-item-surface/40 hover:bg-bg-item-hover text-text-primary border border-transparent'
+                          }`}
+                        >
+                          <div className="flex items-start gap-2 min-w-0">
+                            <div className="p-1.5 rounded-md bg-purple-500/10 text-purple-400 shrink-0 mt-0.5">
+                              <Brain className="w-4 h-4" />
+                            </div>
+                            <div className="min-w-0">
+                              <div className="font-semibold text-xs flex items-center gap-1.5">
+                                <span>AI / ML Role</span>
+                                <span className="text-[9px] px-1 py-0.2 rounded bg-purple-500/20 text-purple-300 font-normal">AI / ML</span>
+                              </div>
+                              <div className="text-[10px] text-text-tertiary truncate mt-0.5">PyTorch, LLMs, Neural Nets, GFG Q&A</div>
+                            </div>
+                          </div>
+                          {resolveRoleSlug(activeRoleTrack) === 'aiml' && <Check className="w-4 h-4 text-purple-400 shrink-0 ml-1 mt-0.5" />}
+                        </button>
+
+                        {/* Technical Interview */}
+                        <button
+                          type="button"
+                          onClick={() => void handleSelectRole('technical-interview')}
+                          className={`flex items-start justify-between rounded-lg p-2 text-xs text-left transition-all cursor-pointer ${
+                            resolveRoleSlug(activeRoleTrack) === 'technical'
+                              ? 'bg-amber-500/15 text-amber-300 font-medium border border-amber-500/40 shadow-sm'
+                              : 'bg-bg-item-surface/40 hover:bg-bg-item-hover text-text-primary border border-transparent'
+                          }`}
+                        >
+                          <div className="flex items-start gap-2 min-w-0">
+                            <div className="p-1.5 rounded-md bg-amber-500/10 text-amber-400 shrink-0 mt-0.5">
+                              <Terminal className="w-4 h-4" />
+                            </div>
+                            <div className="min-w-0">
+                              <div className="font-semibold text-xs flex items-center gap-1.5">
+                                <span>Technical Interview</span>
+                                <span className="text-[9px] px-1 py-0.2 rounded bg-amber-500/20 text-amber-300 font-normal">Tech</span>
+                              </div>
+                              <div className="text-[10px] text-text-tertiary truncate mt-0.5">Algorithms, Systems & Architecture</div>
+                            </div>
+                          </div>
+                          {resolveRoleSlug(activeRoleTrack) === 'technical' && <Check className="w-4 h-4 text-amber-400 shrink-0 ml-1 mt-0.5" />}
+                        </button>
+
+                        {/* General Mode */}
+                        <button
+                          type="button"
+                          onClick={() => void handleSelectRole(null)}
+                          className={`flex items-start justify-between rounded-lg p-2 text-xs text-left transition-all cursor-pointer ${
+                            resolveRoleSlug(activeRoleTrack) === 'general'
+                              ? 'bg-accent-primary/15 text-accent-primary font-medium border border-accent-primary/40 shadow-sm'
+                              : 'bg-bg-item-surface/40 hover:bg-bg-item-hover text-text-primary border border-transparent'
+                          }`}
+                        >
+                          <div className="flex items-start gap-2 min-w-0">
+                            <div className="p-1.5 rounded-md bg-bg-item-surface text-text-tertiary shrink-0 mt-0.5">
+                              <Globe className="w-4 h-4" />
+                            </div>
+                            <div className="min-w-0">
+                              <div className="font-semibold text-xs flex items-center gap-1.5">
+                                <span>General Mode</span>
+                                <span className="text-[9px] px-1 py-0.2 rounded bg-bg-item-surface text-text-secondary font-normal">General</span>
+                              </div>
+                              <div className="text-[10px] text-text-tertiary truncate mt-0.5">Standard interview & general meetings</div>
+                            </div>
+                          </div>
+                          {resolveRoleSlug(activeRoleTrack) === 'general' && <Check className="w-4 h-4 text-accent-primary shrink-0 ml-1 mt-0.5" />}
+                        </button>
+                      </div>
+
+                      <div className="mt-2 pt-1.5 border-t border-border-muted/40 flex items-center justify-between">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setShowRoleSelector(false);
+                            setIsAddCustomFileOpen(true);
+                          }}
+                          className="flex items-center gap-1.5 rounded-lg px-2 py-1 text-xs text-accent-primary hover:bg-accent-primary/10 transition-colors cursor-pointer"
+                        >
+                          <Plus className="w-3.5 h-3.5" />
+                          <span>Add Custom File or MD Note...</span>
+                        </button>
+                        <span className="text-[10px] text-text-tertiary hidden sm:inline">Official handbooks & Nishakar T dossier included</span>
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+
+                {/* IN-FLOW FILE MENU DRAWER */}
+                <AnimatePresence>
+                  {showFileMenu && (
+                    <motion.div
+                      data-file-menu-root=""
+                      initial={{ opacity: 0, height: 0, y: 4 }}
+                      animate={{ opacity: 1, height: 'auto', y: 0 }}
+                      exit={{ opacity: 0, height: 0, y: 4 }}
+                      transition={{ duration: 0.16, ease: 'easeOut' }}
+                      className="w-full mt-2 rounded-xl border border-border-muted bg-bg-elevated/95 p-2.5 shadow-2xl backdrop-blur-xl text-text-primary no-drag overflow-hidden"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <div className="flex items-center justify-between px-1 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-text-tertiary mb-2 border-b border-border-muted/40 pb-1.5">
+                        <div className="flex items-center gap-2">
+                          <span className="text-text-primary">Document & Code Viewer</span>
+                          <span className="text-[9px] lowercase bg-bg-item-surface px-1.5 py-0.5 rounded text-emerald-400 font-mono font-normal">
+                            .md • code
+                          </span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setShowFileMenu(false)}
+                          className="p-1 rounded text-text-tertiary hover:text-text-primary hover:bg-bg-item-hover transition-colors cursor-pointer"
+                          title="Close (Esc)"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+                        {/* Open File from Computer */}
+                        <button
+                          type="button"
+                          onClick={() => void handlePickAndOpenFile()}
+                          className="flex items-center gap-2.5 rounded-lg p-2 text-xs text-left transition-all hover:bg-emerald-500/15 hover:text-emerald-300 text-text-primary group bg-bg-item-surface/40 border border-transparent hover:border-emerald-500/30 cursor-pointer"
+                        >
+                          <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-emerald-500/15 text-emerald-400 group-hover:bg-emerald-500/25 shrink-0">
+                            <FolderOpen className="w-4 h-4" />
+                          </div>
+                          <div className="min-w-0">
+                            <div className="font-medium text-emerald-300">Open File from Computer...</div>
+                            <div className="text-[10px] text-text-tertiary truncate">Browse .md, .txt, .py, code, or documents</div>
+                          </div>
+                        </button>
+
+                        {/* SDE Handbook */}
+                        <div className="flex items-center justify-between rounded-lg p-2 text-xs text-left transition-all bg-bg-item-surface/40 border border-transparent hover:border-cyan-500/30 hover:bg-bg-item-hover text-text-primary group">
+                          <button
+                            type="button"
+                            onClick={() => void handleOpenHandbook('sde')}
+                            className="flex items-center gap-2 flex-1 min-w-0 text-left cursor-pointer no-drag"
+                            title="View SDE Handbook in Assistant"
+                          >
+                            <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-cyan-500/15 text-cyan-400 shrink-0">
+                              <Code className="w-4 h-4" />
+                            </div>
+                            <div className="min-w-0">
+                              <div className="font-medium truncate text-cyan-300">SDE Handbook (.md)</div>
+                              <div className="text-[10px] text-text-tertiary truncate">W3Schools & GFG Q&A with Spoken Answers</div>
+                            </div>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              void handleOpenNativeHandbook('sde');
+                            }}
+                            className="p-1 rounded hover:bg-bg-secondary text-text-tertiary hover:text-cyan-300 transition-colors cursor-pointer shrink-0 ml-1 no-drag"
+                            title="Open on Desktop (VS Code / Notepad)"
+                          >
+                            <ExternalLink className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+
+                        {/* AI/ML Handbook */}
+                        <div className="flex items-center justify-between rounded-lg p-2 text-xs text-left transition-all bg-bg-item-surface/40 border border-transparent hover:border-purple-500/30 hover:bg-bg-item-hover text-text-primary group">
+                          <button
+                            type="button"
+                            onClick={() => void handleOpenHandbook('aiml')}
+                            className="flex items-center gap-2 flex-1 min-w-0 text-left cursor-pointer no-drag"
+                            title="View AI/ML Handbook in Assistant"
+                          >
+                            <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-purple-500/15 text-purple-400 shrink-0">
+                              <Brain className="w-4 h-4" />
+                            </div>
+                            <div className="min-w-0">
+                              <div className="font-medium truncate text-purple-300">AI/ML Handbook (.md)</div>
+                              <div className="text-[10px] text-text-tertiary truncate">PyTorch, ML, LLMs & GFG Q&A</div>
+                            </div>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              void handleOpenNativeHandbook('aiml');
+                            }}
+                            className="p-1 rounded hover:bg-bg-secondary text-text-tertiary hover:text-purple-300 transition-colors cursor-pointer shrink-0 ml-1 no-drag"
+                            title="Open on Desktop (VS Code / Notepad)"
+                          >
+                            <ExternalLink className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+
+                        {/* Candidate Portfolio */}
+                        <div className="flex items-center justify-between rounded-lg p-2 text-xs text-left transition-all bg-bg-item-surface/40 border border-transparent hover:border-emerald-500/30 hover:bg-bg-item-hover text-text-primary group">
+                          <button
+                            type="button"
+                            onClick={() => void handleOpenHandbook('candidate')}
+                            className="flex items-center gap-2 flex-1 min-w-0 text-left cursor-pointer no-drag"
+                            title="View Candidate Portfolio & Projects in Assistant"
+                          >
+                            <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-emerald-500/15 text-emerald-400 shrink-0">
+                              <User className="w-4 h-4" />
+                            </div>
+                            <div className="min-w-0">
+                              <div className="font-medium truncate text-emerald-300">Candidate Portfolio (.md)</div>
+                              <div className="text-[10px] text-text-tertiary truncate">Nishakar T - Threshold AI, Health Forecast</div>
+                            </div>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              void handleOpenNativeHandbook('candidate');
+                            }}
+                            className="p-1 rounded hover:bg-bg-secondary text-text-tertiary hover:text-emerald-300 transition-colors cursor-pointer shrink-0 ml-1 no-drag"
+                            title="Open on Desktop (VS Code / Notepad)"
+                          >
+                            <ExternalLink className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </div>
+
+                      {attachedModeFiles.length > 0 && (
+                        <div className="mt-2 pt-1.5 border-t border-border-muted/40">
+                          <div className="px-1 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-text-tertiary mb-1">
+                            Role Attached Reference Files ({attachedModeFiles.length})
+                          </div>
+                          <div className="max-h-24 overflow-y-auto custom-scrollbar flex flex-col gap-1">
+                            {attachedModeFiles.map((file) => (
+                              <div
+                                key={file.id}
+                                className="flex items-center justify-between rounded-lg px-2 py-1 text-xs text-left bg-bg-item-surface/30 hover:bg-bg-item-hover text-text-primary"
+                              >
+                                <button
+                                  type="button"
+                                  onClick={() => handleOpenAttachedFile(file)}
+                                  className="flex items-center gap-2 truncate flex-1 text-left cursor-pointer no-drag"
+                                  title="View in Assistant"
+                                >
+                                  <FileText className="w-3.5 h-3.5 text-text-secondary shrink-0" />
+                                  <span className="truncate">{file.fileName}</span>
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setShowFileMenu(false);
+                                    const api = (window as any).electronAPI;
+                                    if (api?.modesOpenReferenceFile) {
+                                      void api.modesOpenReferenceFile(file.id);
+                                    }
+                                  }}
+                                  className="p-1 rounded hover:bg-bg-secondary text-text-tertiary hover:text-accent-primary transition-colors cursor-pointer shrink-0 ml-1.5 no-drag"
+                                  title="Open on Desktop in system editor"
+                                >
+                                  <ExternalLink className="w-3 h-3" />
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      <div className="mt-2 pt-1.5 border-t border-border-muted/40 flex items-center justify-between">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setShowFileMenu(false);
+                            setIsAddCustomFileOpen(true);
+                          }}
+                          className="flex items-center gap-1.5 rounded-lg px-2 py-1 text-xs text-accent-primary hover:bg-accent-primary/10 transition-colors cursor-pointer"
+                        >
+                          <Plus className="w-3.5 h-3.5" />
+                          <span>Create or Upload Custom Note...</span>
+                        </button>
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+
                 {/* Bottom Row. pointer-events-none on the ROW: it is a full-width,
                     30px box at z-[60], above the resize handles (z-50), so its
                     empty span shadowed the south handle's top and the corner. Only
@@ -12744,354 +13122,80 @@ Provide only the answer, nothing else.`;
                       <ChevronDown size={12} className="shrink-0 transition-transform" />
                     </button>
 
-                    {/* Role Selector Button & Menu */}
-                    <div className="relative">
-                      <button
-                        onClick={() => {
-                          setShowRoleSelector((prev) => !prev);
-                          setShowFileMenu(false);
-                        }}
-                        title={t('Current Interview Role: Click to switch between SDE, AI/ML, and General')}
-                        className={`
-                          flex items-center gap-1.5 px-2 h-7 rounded-[9px] border text-xs font-medium
-                          interaction-base interaction-press transition-all shrink-0
-                          ${
-                            activeRoleTrack?.includes('sde')
-                              ? 'border-cyan-500/40 bg-cyan-500/15 text-cyan-300'
-                              : activeRoleTrack?.includes('aiml')
-                              ? 'border-purple-500/40 bg-purple-500/15 text-purple-300'
-                              : 'border-border-muted bg-bg-item-surface text-text-secondary hover:text-text-primary'
-                          }
-                        `}
-                      >
-                        {activeRoleTrack?.includes('sde') ? (
-                          <>
-                            <Code className="w-3.5 h-3.5 text-cyan-400" />
-                            <span>Role: SDE</span>
-                          </>
-                        ) : activeRoleTrack?.includes('aiml') ? (
-                          <>
-                            <Brain className="w-3.5 h-3.5 text-purple-400" />
-                            <span>Role: AI/ML</span>
-                          </>
-                        ) : activeRoleTrack?.includes('technical') ? (
-                          <>
-                            <Terminal className="w-3.5 h-3.5 text-amber-400" />
-                            <span>Role: Tech</span>
-                          </>
-                        ) : (
-                          <>
-                            <Globe className="w-3.5 h-3.5 text-text-tertiary" />
-                            <span>Role: General</span>
-                          </>
-                        )}
-                        <ChevronDown className="w-3 h-3 opacity-60 ml-0.5" />
-                      </button>
-
-                      {showRoleSelector && (
-                        <div
-                          className="absolute bottom-full mb-1.5 left-0 z-[100] w-72 max-h-[340px] overflow-y-auto rounded-xl border border-border-muted bg-bg-elevated p-2 shadow-2xl backdrop-blur-md text-text-primary no-drag custom-scrollbar"
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          <div className="flex items-center justify-between px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-text-tertiary mb-1">
-                            <span>Select Interview Role</span>
-                            <span className="text-[9px] lowercase bg-bg-item-surface px-1.5 py-0.5 rounded text-accent-primary font-mono">default roles</span>
-                          </div>
-
-                          {/* SDE Role */}
-                          <button
-                            onClick={() => handleSelectRole('sde-interview')}
-                            className={`flex items-center justify-between w-full rounded-lg px-2.5 py-2 text-xs text-left transition-colors ${
-                              activeRoleTrack?.includes('sde') ? 'bg-cyan-500/15 text-cyan-300 font-medium border border-cyan-500/30' : 'hover:bg-bg-item-hover text-text-primary'
-                            }`}
-                          >
-                            <div className="flex items-center gap-2.5">
-                              <div className="p-1.5 rounded-md bg-cyan-500/10 text-cyan-400 shrink-0">
-                                <Code className="w-4 h-4" />
-                              </div>
-                              <div>
-                                <div className="font-semibold text-xs flex items-center gap-1.5">
-                                  <span>SDE Role</span>
-                                  <span className="text-[9px] px-1 py-0.2 rounded bg-cyan-500/20 text-cyan-300 font-normal">SDE / Core</span>
-                                </div>
-                                <div className="text-[10px] text-text-tertiary">DSA, System Design, GFG & W3Schools Q&A</div>
-                              </div>
-                            </div>
-                            {activeRoleTrack?.includes('sde') && <Check className="w-4 h-4 text-cyan-400 shrink-0" />}
-                          </button>
-
-                          {/* AI / ML Role */}
-                          <button
-                            onClick={() => handleSelectRole('aiml-interview')}
-                            className={`flex items-center justify-between w-full rounded-lg px-2.5 py-2 text-xs text-left transition-colors mt-1 ${
-                              activeRoleTrack?.includes('aiml') ? 'bg-purple-500/15 text-purple-300 font-medium border border-purple-500/30' : 'hover:bg-bg-item-hover text-text-primary'
-                            }`}
-                          >
-                            <div className="flex items-center gap-2.5">
-                              <div className="p-1.5 rounded-md bg-purple-500/10 text-purple-400 shrink-0">
-                                <Brain className="w-4 h-4" />
-                              </div>
-                              <div>
-                                <div className="font-semibold text-xs flex items-center gap-1.5">
-                                  <span>AI / ML Role</span>
-                                  <span className="text-[9px] px-1 py-0.2 rounded bg-purple-500/20 text-purple-300 font-normal">AI / ML</span>
-                                </div>
-                                <div className="text-[10px] text-text-tertiary">PyTorch, LLMs, Neural Nets, GFG Q&A</div>
-                              </div>
-                            </div>
-                            {activeRoleTrack?.includes('aiml') && <Check className="w-4 h-4 text-purple-400 shrink-0" />}
-                          </button>
-
-                          {/* Technical Interview */}
-                          <button
-                            onClick={() => handleSelectRole('technical-interview')}
-                            className={`flex items-center justify-between w-full rounded-lg px-2.5 py-2 text-xs text-left transition-colors mt-1 ${
-                              activeRoleTrack?.includes('technical') ? 'bg-amber-500/15 text-amber-300 font-medium border border-amber-500/30' : 'hover:bg-bg-item-hover text-text-primary'
-                            }`}
-                          >
-                            <div className="flex items-center gap-2.5">
-                              <div className="p-1.5 rounded-md bg-amber-500/10 text-amber-400 shrink-0">
-                                <Terminal className="w-4 h-4" />
-                              </div>
-                              <div>
-                                <div className="font-semibold text-xs flex items-center gap-1.5">
-                                  <span>Technical Interview</span>
-                                  <span className="text-[9px] px-1 py-0.2 rounded bg-amber-500/20 text-amber-300 font-normal">Tech</span>
-                                </div>
-                                <div className="text-[10px] text-text-tertiary">Algorithms, Systems & Architecture</div>
-                              </div>
-                            </div>
-                            {activeRoleTrack?.includes('technical') && <Check className="w-4 h-4 text-amber-400 shrink-0" />}
-                          </button>
-
-                          {/* General Mode */}
-                          <button
-                            onClick={() => handleSelectRole(null)}
-                            className={`flex items-center justify-between w-full rounded-lg px-2.5 py-2 text-xs text-left transition-colors mt-1 ${
-                              !activeRoleTrack || activeRoleTrack === 'general' ? 'bg-accent-primary/15 text-accent-primary font-medium border border-accent-primary/30' : 'hover:bg-bg-item-hover text-text-primary'
-                            }`}
-                          >
-                            <div className="flex items-center gap-2.5">
-                              <div className="p-1.5 rounded-md bg-bg-item-surface text-text-tertiary shrink-0">
-                                <Globe className="w-4 h-4" />
-                              </div>
-                              <div>
-                                <div className="font-semibold text-xs">General Mode</div>
-                                <div className="text-[10px] text-text-tertiary">Standard interview & general meetings</div>
-                              </div>
-                            </div>
-                            {(!activeRoleTrack || activeRoleTrack === 'general') && <Check className="w-4 h-4 text-accent-primary shrink-0" />}
-                          </button>
-
-                          <div className="my-1.5 border-t border-border-muted/50" />
-
-                          <button
-                            onClick={() => {
-                              setShowRoleSelector(false);
-                              setIsAddCustomFileOpen(true);
-                            }}
-                            className="flex items-center gap-2 w-full rounded-lg px-2.5 py-2 text-xs text-accent-primary hover:bg-accent-primary/10 transition-colors"
-                          >
-                            <Plus className="w-3.5 h-3.5" />
-                            <span>Add Custom File or MD Note...</span>
-                          </button>
-                        </div>
+                    {/* Role Selector Button */}
+                    <button
+                      data-role-selector-toggle="true"
+                      onClick={() => {
+                        setShowRoleSelector((prev) => !prev);
+                        setShowFileMenu(false);
+                      }}
+                      title={t('Current Interview Role: Click to switch between SDE, AI/ML, and General')}
+                      className={`
+                        flex items-center gap-1.5 px-2 h-7 rounded-[9px] border text-xs font-medium
+                        interaction-base interaction-press transition-all shrink-0 no-drag cursor-pointer
+                        ${
+                          resolveRoleSlug(activeRoleTrack) === 'sde'
+                            ? 'border-cyan-500/40 bg-cyan-500/15 text-cyan-300'
+                            : resolveRoleSlug(activeRoleTrack) === 'aiml'
+                            ? 'border-purple-500/40 bg-purple-500/15 text-purple-300'
+                            : resolveRoleSlug(activeRoleTrack) === 'technical'
+                            ? 'border-amber-500/40 bg-amber-500/15 text-amber-300'
+                            : 'border-border-muted bg-bg-item-surface text-text-secondary hover:text-text-primary'
+                        }
+                      `}
+                    >
+                      {resolveRoleSlug(activeRoleTrack) === 'sde' ? (
+                        <>
+                          <Code className="w-3.5 h-3.5 text-cyan-400" />
+                          <span>Role: SDE</span>
+                        </>
+                      ) : resolveRoleSlug(activeRoleTrack) === 'aiml' ? (
+                        <>
+                          <Brain className="w-3.5 h-3.5 text-purple-400" />
+                          <span>Role: AI/ML</span>
+                        </>
+                      ) : resolveRoleSlug(activeRoleTrack) === 'technical' ? (
+                        <>
+                          <Terminal className="w-3.5 h-3.5 text-amber-400" />
+                          <span>Role: Tech</span>
+                        </>
+                      ) : (
+                        <>
+                          <Globe className="w-3.5 h-3.5 text-text-tertiary" />
+                          <span>Role: General</span>
+                        </>
                       )}
-                    </div>
+                      <ChevronDown className={`w-3 h-3 opacity-60 ml-0.5 transition-transform ${showRoleSelector ? 'rotate-180' : ''}`} />
+                    </button>
 
-                    {/* Dedicated File Open Button & Menu */}
-                    <div className="relative">
-                      <button
-                        onClick={() => {
-                          const nextState = !showFileMenu;
-                          setShowFileMenu(nextState);
-                          setShowRoleSelector(false);
-                          if (nextState && activeRoleTrack) {
-                            window.electronAPI?.modesGetReferenceFiles?.(activeRoleTrack).then((files: any) => {
-                              if (Array.isArray(files)) setAttachedModeFiles(files);
-                            }).catch(() => {});
-                          }
-                        }}
-                        title={t('File Open: Open local files, official handbooks, or custom notes')}
-                        className={`
-                          flex items-center gap-1.5 px-2 h-7 rounded-[9px] border text-xs font-medium
-                          interaction-base interaction-press transition-all shrink-0
-                          ${
-                            showFileMenu
-                              ? 'border-emerald-500/50 bg-emerald-500/15 text-emerald-300'
-                              : 'border-border-muted bg-bg-item-surface text-text-secondary hover:text-text-primary hover:border-emerald-500/30'
-                          }
-                        `}
-                      >
-                        <FolderOpen className="w-3.5 h-3.5 text-emerald-400" />
-                        <span>File Open</span>
-                        <ChevronDown className="w-3 h-3 opacity-60 ml-0.5" />
-                      </button>
-
-                      {showFileMenu && (
-                        <div
-                          className="absolute bottom-full mb-1.5 left-0 z-[100] w-72 rounded-xl border border-border-muted bg-bg-elevated p-2 shadow-2xl backdrop-blur-md text-text-primary"
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          <div className="flex items-center justify-between px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-text-tertiary">
-                            <span>Document & Code Viewer</span>
-                            <span className="text-[9px] lowercase bg-bg-item-surface px-1.5 py-0.5 rounded text-emerald-400 font-mono">.md • code</span>
-                          </div>
-
-                          <button
-                            onClick={() => void handlePickAndOpenFile()}
-                            className="flex items-center gap-2.5 w-full rounded-lg px-2.5 py-2 text-xs text-left transition-colors hover:bg-emerald-500/15 hover:text-emerald-300 text-text-primary group"
-                          >
-                            <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-emerald-500/15 text-emerald-400 group-hover:bg-emerald-500/25 shrink-0">
-                              <FolderOpen className="w-4 h-4" />
-                            </div>
-                            <div className="min-w-0">
-                              <div className="font-medium text-emerald-300">Open File from Computer...</div>
-                              <div className="text-[10px] text-text-tertiary truncate">Browse .md, .txt, .py, code, or documents</div>
-                            </div>
-                          </button>
-
-                          <div className="my-1 border-t border-border-muted/50" />
-
-                          <div className="px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-text-tertiary">
-                            Official Handbooks & Dossier
-                          </div>
-
-                          <div className="flex items-center justify-between w-full rounded-lg px-2 py-1.5 text-xs text-left transition-colors hover:bg-bg-item-hover text-text-primary group">
-                            <button
-                              type="button"
-                              onClick={() => void handleOpenHandbook('sde')}
-                              className="flex items-center gap-2 flex-1 min-w-0 text-left cursor-pointer no-drag"
-                              title="View SDE Handbook in Assistant"
-                            >
-                              <Code className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
-                              <div className="min-w-0">
-                                <div className="font-medium truncate">SDE Handbook (.md)</div>
-                                <div className="text-[10px] text-text-tertiary truncate">W3Schools & GFG Q&A with Spoken Answers</div>
-                              </div>
-                            </button>
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                void handleOpenNativeHandbook('sde');
-                              }}
-                              className="p-1 rounded hover:bg-bg-secondary text-text-tertiary hover:text-cyan-300 transition-colors cursor-pointer shrink-0 ml-1.5 no-drag"
-                              title="Open on Desktop in system editor (VS Code, Notepad)"
-                            >
-                              <ExternalLink className="w-3.5 h-3.5" />
-                            </button>
-                          </div>
-
-                          <div className="flex items-center justify-between w-full rounded-lg px-2 py-1.5 text-xs text-left transition-colors hover:bg-bg-item-hover text-text-primary group mt-0.5">
-                            <button
-                              type="button"
-                              onClick={() => void handleOpenHandbook('aiml')}
-                              className="flex items-center gap-2 flex-1 min-w-0 text-left cursor-pointer no-drag"
-                              title="View AI/ML Handbook in Assistant"
-                            >
-                              <Brain className="w-3.5 h-3.5 text-purple-400 shrink-0" />
-                              <div className="min-w-0">
-                                <div className="font-medium truncate">AI/ML Handbook (.md)</div>
-                                <div className="text-[10px] text-text-tertiary truncate">PyTorch, ML, LLMs & GFG Q&A</div>
-                              </div>
-                            </button>
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                void handleOpenNativeHandbook('aiml');
-                              }}
-                              className="p-1 rounded hover:bg-bg-secondary text-text-tertiary hover:text-purple-300 transition-colors cursor-pointer shrink-0 ml-1.5 no-drag"
-                              title="Open on Desktop in system editor (VS Code, Notepad)"
-                            >
-                              <ExternalLink className="w-3.5 h-3.5" />
-                            </button>
-                          </div>
-
-                          <div className="flex items-center justify-between w-full rounded-lg px-2 py-1.5 text-xs text-left transition-colors hover:bg-bg-item-hover text-text-primary group mt-0.5">
-                            <button
-                              type="button"
-                              onClick={() => void handleOpenHandbook('candidate')}
-                              className="flex items-center gap-2 flex-1 min-w-0 text-left cursor-pointer no-drag"
-                              title="View Candidate Portfolio & Projects in Assistant"
-                            >
-                              <User className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                              <div className="min-w-0">
-                                <div className="font-medium truncate">Candidate Portfolio (.md)</div>
-                                <div className="text-[10px] text-text-tertiary truncate">Nishakar T - Threshold AI, Health Forecast, IoT</div>
-                              </div>
-                            </button>
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                void handleOpenNativeHandbook('candidate');
-                              }}
-                              className="p-1 rounded hover:bg-bg-secondary text-text-tertiary hover:text-emerald-300 transition-colors cursor-pointer shrink-0 ml-1.5 no-drag"
-                              title="Open on Desktop in system editor (VS Code, Notepad)"
-                            >
-                              <ExternalLink className="w-3.5 h-3.5" />
-                            </button>
-                          </div>
-
-                          {attachedModeFiles.length > 0 && (
-                            <>
-                              <div className="my-1 border-t border-border-muted/50" />
-                              <div className="px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-text-tertiary">
-                                Attached Reference Files ({attachedModeFiles.length})
-                              </div>
-                              <div className="max-h-28 overflow-y-auto custom-scrollbar">
-                                {attachedModeFiles.map((file) => (
-                                  <div
-                                    key={file.id}
-                                    className="flex items-center justify-between w-full rounded-lg px-2 py-1 text-xs text-left transition-colors hover:bg-bg-item-hover text-text-primary group"
-                                  >
-                                    <button
-                                      type="button"
-                                      onClick={() => handleOpenAttachedFile(file)}
-                                      className="flex items-center gap-2 truncate flex-1 text-left cursor-pointer no-drag"
-                                      title="View in Assistant"
-                                    >
-                                      <FileText className="w-3.5 h-3.5 text-text-secondary shrink-0" />
-                                      <span className="truncate">{file.fileName}</span>
-                                    </button>
-                                    <button
-                                      type="button"
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        setShowFileMenu(false);
-                                        const api = (window as any).electronAPI;
-                                        if (api?.modesOpenReferenceFile) {
-                                          void api.modesOpenReferenceFile(file.id);
-                                        }
-                                      }}
-                                      className="p-1 rounded hover:bg-bg-secondary text-text-tertiary hover:text-accent-primary transition-colors cursor-pointer shrink-0 ml-1.5 no-drag"
-                                      title="Open on Desktop in system editor"
-                                    >
-                                      <ExternalLink className="w-3 h-3" />
-                                    </button>
-                                  </div>
-                                ))}
-                              </div>
-                            </>
-                          )}
-
-                          <div className="my-1 border-t border-border-muted/50" />
-
-                          <button
-                            onClick={() => {
-                              setShowFileMenu(false);
-                              setIsAddCustomFileOpen(true);
-                            }}
-                            className="flex items-center gap-2 w-full rounded-lg px-2.5 py-1.5 text-xs text-accent-primary hover:bg-accent-primary/10 transition-colors"
-                          >
-                            <Plus className="w-3.5 h-3.5" />
-                            <span>Create or Upload Custom Note...</span>
-                          </button>
-                        </div>
-                      )}
-                    </div>
+                    {/* Dedicated File Open Button */}
+                    <button
+                      data-file-menu-toggle="true"
+                      onClick={() => {
+                        const nextState = !showFileMenu;
+                        setShowFileMenu(nextState);
+                        setShowRoleSelector(false);
+                        if (nextState && activeRoleTrack) {
+                          window.electronAPI?.modesGetReferenceFiles?.(activeRoleTrack).then((files: any) => {
+                            if (Array.isArray(files)) setAttachedModeFiles(files);
+                          }).catch(() => {});
+                        }
+                      }}
+                      title={t('File Open: Open local files, official handbooks, or custom notes')}
+                      className={`
+                        flex items-center gap-1.5 px-2 h-7 rounded-[9px] border text-xs font-medium
+                        interaction-base interaction-press transition-all shrink-0 no-drag cursor-pointer
+                        ${
+                          showFileMenu
+                            ? 'border-emerald-500/50 bg-emerald-500/15 text-emerald-300'
+                            : 'border-border-muted bg-bg-item-surface text-text-secondary hover:text-text-primary hover:border-emerald-500/30'
+                        }
+                      `}
+                    >
+                      <FolderOpen className="w-3.5 h-3.5 text-emerald-400" />
+                      <span>File Open</span>
+                      <ChevronDown className={`w-3 h-3 opacity-60 ml-0.5 transition-transform ${showFileMenu ? 'rotate-180' : ''}`} />
+                    </button>
 
                     <div className="relative">
                       <button
