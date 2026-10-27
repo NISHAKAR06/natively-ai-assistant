@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { X, Plus, Trash2, Upload, FileText, Check, Sparkles, Save, Loader2, Code, Brain } from 'lucide-react';
+import { X, Plus, Trash2, Upload, FileText, Check, Sparkles, Save, Loader2, Code, Brain, Eye, BookOpen, ExternalLink } from 'lucide-react';
 import { ModesSettings as PremiumModesSettings } from '../../premium';
 import { AipSelect } from './AIProvidersSettings';
+import { FileViewerModal } from '../ui/FileViewerModal';
 
 const TEMPLATE_OPTIONS = [
   { value: 'general', label: 'General' },
@@ -54,6 +55,87 @@ const BuiltinModesSettings: React.FC<ModesSettingsProps> = ({ onClose }) => {
   const [newModeName, setNewModeName] = useState('');
   const [newModeTemplate, setNewModeTemplate] = useState('technical-interview');
   const [showCreateForm, setShowCreateForm] = useState(false);
+  const [viewingFile, setViewingFile] = useState<{
+    isOpen: boolean;
+    title: string;
+    fileName: string;
+    content: string;
+    fileId?: string;
+    bookId?: string;
+  } | null>(null);
+
+  const handleViewHandbook = async (bookId: 'sde-handbook' | 'aiml-handbook') => {
+    const api = (window as any).electronAPI;
+    if (!api?.knowledgeBooksGetBooks) return;
+    try {
+      const res = await api.knowledgeBooksGetBooks();
+      if (res?.success && Array.isArray(res.books)) {
+        const found = res.books.find(
+          (b: any) =>
+            b.id === bookId ||
+            (bookId.includes('sde') && b.id.includes('sde')) ||
+            (bookId.includes('aiml') && b.id.includes('aiml'))
+        );
+        if (found) {
+          setViewingFile({
+            isOpen: true,
+            title: found.title,
+            fileName: found.fileName,
+            content: found.content,
+            bookId: found.id,
+          });
+        }
+      }
+    } catch (e: any) {
+      console.error('Error fetching knowledge handbook:', e);
+    }
+  };
+
+  const handleOpenHandbookNative = async (bookId: 'sde-handbook' | 'aiml-handbook') => {
+    const api = (window as any).electronAPI;
+    if (!api?.knowledgeBooksOpenBook) return;
+    const res = await api.knowledgeBooksOpenBook(bookId);
+    if (res?.success) {
+      setStatusMsg('Handbook opened in OS default editor!');
+      setTimeout(() => setStatusMsg(null), 2500);
+    } else if (res?.error) {
+      setStatusMsg(`Could not open: ${res.error}`);
+      setTimeout(() => setStatusMsg(null), 3000);
+    }
+  };
+
+  const handleViewFile = async (f: ReferenceFileItem) => {
+    let content = (f as any).content;
+    if (!content) {
+      const api = (window as any).electronAPI;
+      if (api?.modesGetReferenceFileById) {
+        const res = await api.modesGetReferenceFileById(f.id);
+        if (res?.success && res.file?.content) {
+          content = res.file.content;
+        }
+      }
+    }
+    setViewingFile({
+      isOpen: true,
+      title: f.fileName,
+      fileName: f.fileName,
+      content: content || '_(No text content preview available)_',
+      fileId: f.id,
+    });
+  };
+
+  const handleOpenFileNative = async (fileId: string) => {
+    const api = (window as any).electronAPI;
+    if (!api?.modesOpenReferenceFile) return;
+    const res = await api.modesOpenReferenceFile(fileId);
+    if (res?.success) {
+      setStatusMsg('File opened on Desktop!');
+      setTimeout(() => setStatusMsg(null), 2500);
+    } else if (res?.error) {
+      setStatusMsg(`Open error: ${res.error}`);
+      setTimeout(() => setStatusMsg(null), 3000);
+    }
+  };
 
   const loadModes = useCallback(async () => {
     const api = (window as any).electronAPI;
@@ -396,6 +478,76 @@ const BuiltinModesSettings: React.FC<ModesSettingsProps> = ({ onClose }) => {
 
             {/* Reference Files (PDF / DOCX / TXT / Code RAG) */}
             <div className="flex flex-col space-y-2.5">
+              {/* Official Technical Interview Knowledge Handbooks Banner */}
+              <div className="flex flex-col gap-2 rounded-xl border border-border-muted bg-bg-secondary/40 p-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <BookOpen className="h-4 w-4 text-accent-primary" />
+                    <span className="text-xs font-semibold text-text-primary">
+                      Official Interview Handbooks (W3Schools Q&A + Code)
+                    </span>
+                  </div>
+                  <span className="text-[10px] rounded bg-emerald-500/10 px-1.5 py-0.5 text-emerald-400 border border-emerald-500/20">
+                    Always Indexed
+                  </span>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-1">
+                  {/* SDE Handbook */}
+                  <div className="flex items-center justify-between rounded-lg border border-cyan-500/30 bg-cyan-500/5 px-2.5 py-2 text-xs">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <Code className="h-3.5 w-3.5 shrink-0 text-cyan-400" />
+                      <div className="min-w-0">
+                        <div className="font-medium text-cyan-200 truncate">SDE Interview Handbook</div>
+                        <div className="text-[10px] text-text-tertiary">DSA, System Design, W3Schools Q&A</div>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1 shrink-0 ml-2">
+                      <button
+                        onClick={() => void handleViewHandbook('sde-handbook')}
+                        className="flex items-center gap-1 rounded bg-cyan-500/20 px-2 py-1 text-[11px] font-medium text-cyan-300 hover:bg-cyan-500/30"
+                        title="View SDE Handbook in App"
+                      >
+                        <Eye className="h-3 w-3" /> View
+                      </button>
+                      <button
+                        onClick={() => void handleOpenHandbookNative('sde-handbook')}
+                        className="rounded p-1 text-cyan-300 hover:bg-cyan-500/20"
+                        title="Open on Desktop (VS Code / Notepad)"
+                      >
+                        <ExternalLink className="h-3 w-3" />
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* AI/ML Handbook */}
+                  <div className="flex items-center justify-between rounded-lg border border-purple-500/30 bg-purple-500/5 px-2.5 py-2 text-xs">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <Brain className="h-3.5 w-3.5 shrink-0 text-purple-400" />
+                      <div className="min-w-0">
+                        <div className="font-medium text-purple-200 truncate">AI/ML Interview Handbook</div>
+                        <div className="text-[10px] text-text-tertiary">PyTorch, LLMs, W3Schools Q&A</div>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1 shrink-0 ml-2">
+                      <button
+                        onClick={() => void handleViewHandbook('aiml-handbook')}
+                        className="flex items-center gap-1 rounded bg-purple-500/20 px-2 py-1 text-[11px] font-medium text-purple-300 hover:bg-purple-500/30"
+                        title="View AI/ML Handbook in App"
+                      >
+                        <Eye className="h-3 w-3" /> View
+                      </button>
+                      <button
+                        onClick={() => void handleOpenHandbookNative('aiml-handbook')}
+                        className="rounded p-1 text-purple-300 hover:bg-purple-500/20"
+                        title="Open on Desktop (VS Code / Notepad)"
+                      >
+                        <ExternalLink className="h-3 w-3" />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
               <div className="flex items-center justify-between">
                 <div>
                   <h3 className="text-xs font-semibold text-text-primary">
@@ -434,9 +586,9 @@ const BuiltinModesSettings: React.FC<ModesSettingsProps> = ({ onClose }) => {
               {refFiles.length === 0 ? (
                 <div className="rounded-lg border border-dashed border-border-muted p-4 text-center text-xs text-text-secondary">
                   {selectedMode.templateType === 'sde-interview'
-                    ? 'No SDE reference files attached yet. Upload DSA sheets, System Design notes, or SDE resume.'
+                    ? 'No custom SDE reference files attached yet. Official SDE handbook is indexed above. You can upload your personal resume or DSA sheets.'
                     : selectedMode.templateType === 'aiml-interview'
-                    ? 'No AI/ML reference files attached yet. Upload model notes, PyTorch docs, or AI/ML resume.'
+                    ? 'No custom AI/ML reference files attached yet. Official AI/ML handbook is indexed above. You can upload your personal resume or ML notes.'
                     : 'No reference files attached to this mode yet.'}
                 </div>
               ) : (
@@ -455,13 +607,29 @@ const BuiltinModesSettings: React.FC<ModesSettingsProps> = ({ onClose }) => {
                           </span>
                         ) : null}
                       </div>
-                      <button
-                        onClick={() => void handleDeleteFile(f.id)}
-                        className="rounded p-1 text-text-secondary hover:text-red-400"
-                        title="Remove file"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </button>
+                      <div className="flex items-center gap-1 shrink-0 ml-2">
+                        <button
+                          onClick={() => void handleViewFile(f)}
+                          className="rounded p-1 text-text-secondary hover:text-accent-primary hover:bg-bg-secondary"
+                          title="View / Preview file in App"
+                        >
+                          <Eye className="h-3.5 w-3.5" />
+                        </button>
+                        <button
+                          onClick={() => void handleOpenFileNative(f.id)}
+                          className="rounded p-1 text-text-secondary hover:text-accent-primary hover:bg-bg-secondary"
+                          title="Open on Desktop (VS Code / Notepad)"
+                        >
+                          <ExternalLink className="h-3.5 w-3.5" />
+                        </button>
+                        <button
+                          onClick={() => void handleDeleteFile(f.id)}
+                          className="rounded p-1 text-text-secondary hover:text-red-400 hover:bg-bg-secondary"
+                          title="Remove file"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -474,6 +642,18 @@ const BuiltinModesSettings: React.FC<ModesSettingsProps> = ({ onClose }) => {
           </div>
         )}
       </div>
+
+      {viewingFile && (
+        <FileViewerModal
+          isOpen={viewingFile.isOpen}
+          onClose={() => setViewingFile(null)}
+          title={viewingFile.title}
+          fileName={viewingFile.fileName}
+          content={viewingFile.content}
+          fileId={viewingFile.fileId}
+          bookId={viewingFile.bookId}
+        />
+      )}
     </div>
   );
 };

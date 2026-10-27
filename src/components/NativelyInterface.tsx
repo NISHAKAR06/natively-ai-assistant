@@ -20,7 +20,9 @@ import {
   RefreshCw,
   SlidersHorizontal,
   X,
+  BookOpen,
 } from 'lucide-react';
+import { FileViewerModal } from './ui/FileViewerModal';
 import {
   mergeRollingTranscriptFinal,
   mergeRollingTranscriptPartial,
@@ -1440,6 +1442,42 @@ const NativelyInterface: React.FC<NativelyInterfaceProps> = ({
   const [sttInterviewerProvider, setSttInterviewerProvider] = useState<string>('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [handbookViewer, setHandbookViewer] = useState<{
+    isOpen: boolean;
+    title: string;
+    fileName: string;
+    content: string;
+    bookId: string;
+    availableBooks?: Array<{ id: string; title: string; fileName: string; content: string }>;
+  } | null>(null);
+
+  const handleToggleHandbookViewer = async () => {
+    if (handbookViewer?.isOpen) {
+      setHandbookViewer(null);
+      return;
+    }
+    const api = (window as any).electronAPI;
+    if (!api?.knowledgeBooksGetBooks) return;
+    try {
+      const res = await api.knowledgeBooksGetBooks();
+      if (res?.success && Array.isArray(res.books) && res.books.length > 0) {
+        const isAiml = (activeModeLabel || '').toLowerCase().includes('ai') || (activeModeLabel || '').toLowerCase().includes('ml');
+        const defaultBook =
+          (isAiml ? res.books.find((b: any) => b.id.includes('aiml')) : res.books.find((b: any) => b.id.includes('sde'))) ||
+          res.books[0];
+        setHandbookViewer({
+          isOpen: true,
+          title: defaultBook.title,
+          fileName: defaultBook.fileName,
+          content: defaultBook.content,
+          bookId: defaultBook.id,
+          availableBooks: res.books,
+        });
+      }
+    } catch (e) {
+      console.error('Error opening handbook viewer:', e);
+    }
+  };
   const [conversationContext, setConversationContext] = useState<string>('');
   const [isManualRecording, setIsManualRecording] = useState(false);
   const isRecordingRef = useRef(false); // Ref to track recording state (avoids stale closure)
@@ -12577,6 +12615,17 @@ Provide only the answer, nothing else.`;
                       </button>
                     </div>
 
+                    {/* Official Technical Interview Handbooks Viewer */}
+                    <div className="relative">
+                      <button
+                        onClick={() => void handleToggleHandbookViewer()}
+                        title={t('Official Technical Interview Handbooks (SDE & AI/ML)')}
+                        className="w-7 h-7 rounded-[9px] flex items-center justify-center interaction-base interaction-press overlay-bare-icon text-cyan-400 hover:text-cyan-300"
+                      >
+                        <BookOpen className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+
                     {/* Mouse Passthrough Toggle */}
                     <div className="relative">
                       <button
@@ -12661,6 +12710,31 @@ Provide only the answer, nothing else.`;
           </motion.div>
       {/* end always-mounted shell */}
     </div>
+
+    {handbookViewer && (
+      <FileViewerModal
+        isOpen={handbookViewer.isOpen}
+        onClose={() => setHandbookViewer(null)}
+        title={handbookViewer.title}
+        fileName={handbookViewer.fileName}
+        content={handbookViewer.content}
+        bookId={handbookViewer.bookId}
+        availableBooks={handbookViewer.availableBooks}
+        onSelectBook={(selected) => {
+          setHandbookViewer((prev) =>
+            prev
+              ? {
+                  ...prev,
+                  title: selected.title,
+                  fileName: selected.fileName,
+                  content: selected.content,
+                  bookId: selected.id,
+                }
+              : null
+          );
+        }}
+      />
+    )}
     </>
   );
 };

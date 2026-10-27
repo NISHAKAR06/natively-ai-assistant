@@ -18671,6 +18671,144 @@ export function initializeIpcHandlers(appState: AppState): void {
     }
   });
 
+  safeHandle('modes:open-reference-file', async (_, fileId: string) => {
+    try {
+      const db = DatabaseManager.getInstance();
+      const row = db?.getReferenceFileById?.(fileId);
+      let targetPath: string | null = null;
+
+      const sdeCandidates = [
+        path.resolve(__dirname, '../../knowledge-books/SDE_Interview_Official_Handbook.md'),
+        path.resolve(__dirname, '../../resources/knowledge-books/SDE_Interview_Official_Handbook.md'),
+        path.resolve(process.cwd(), 'knowledge-books/SDE_Interview_Official_Handbook.md'),
+      ];
+      const aimlCandidates = [
+        path.resolve(__dirname, '../../knowledge-books/AIML_Interview_Official_Handbook.md'),
+        path.resolve(__dirname, '../../resources/knowledge-books/AIML_Interview_Official_Handbook.md'),
+        path.resolve(process.cwd(), 'knowledge-books/AIML_Interview_Official_Handbook.md'),
+      ];
+
+      if (row?.file_name?.includes('SDE_Interview_Official_Handbook')) {
+        targetPath = sdeCandidates.find((p: string) => fs.existsSync(p)) || null;
+      } else if (row?.file_name?.includes('AIML_Interview_Official_Handbook')) {
+        targetPath = aimlCandidates.find((p: string) => fs.existsSync(p)) || null;
+      }
+
+      if (!targetPath && row?.content) {
+        // Cache to temp directory so the user can open it in their default desktop app
+        const tempDir = path.join(app.getPath('temp'), 'natively-reference-files');
+        if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true });
+        const cleanName = (row.file_name || `file_${fileId}.txt`).replace(/[<>:"/\\|?*]/g, '_');
+        targetPath = path.join(tempDir, cleanName);
+        fs.writeFileSync(targetPath, row.content, 'utf-8');
+      }
+
+      if (targetPath && fs.existsSync(targetPath)) {
+        const err = await shell.openPath(targetPath);
+        return err ? { success: false, error: err } : { success: true, path: targetPath };
+      }
+      return { success: false, error: 'Could not resolve file on disk' };
+    } catch (e: any) {
+      console.error('[IPC] modes:open-reference-file error:', e);
+      return { success: false, error: e?.message || String(e) };
+    }
+  });
+
+  safeHandle('modes:get-reference-file-by-id', async (_, fileId: string) => {
+    try {
+      const db = DatabaseManager.getInstance();
+      const row = db?.getReferenceFileById?.(fileId);
+      if (!row) return { success: false, error: 'File not found' };
+      return {
+        success: true,
+        file: {
+          id: row.id,
+          modeId: row.mode_id,
+          fileName: row.file_name,
+          content: row.content ?? '',
+          createdAt: row.created_at,
+          pageCount: row.page_count,
+        },
+      };
+    } catch (e: any) {
+      console.error('[IPC] modes:get-reference-file-by-id error:', e);
+      return { success: false, error: e?.message || String(e) };
+    }
+  });
+
+  safeHandle('knowledge-books:get-books', async () => {
+    try {
+      const sdeCandidates = [
+        path.resolve(__dirname, '../../knowledge-books/SDE_Interview_Official_Handbook.md'),
+        path.resolve(__dirname, '../../resources/knowledge-books/SDE_Interview_Official_Handbook.md'),
+        path.resolve(process.cwd(), 'knowledge-books/SDE_Interview_Official_Handbook.md'),
+      ];
+      const aimlCandidates = [
+        path.resolve(__dirname, '../../knowledge-books/AIML_Interview_Official_Handbook.md'),
+        path.resolve(__dirname, '../../resources/knowledge-books/AIML_Interview_Official_Handbook.md'),
+        path.resolve(process.cwd(), 'knowledge-books/AIML_Interview_Official_Handbook.md'),
+      ];
+
+      const sdePath = sdeCandidates.find((p: string) => fs.existsSync(p)) || sdeCandidates[0];
+      const aimlPath = aimlCandidates.find((p: string) => fs.existsSync(p)) || aimlCandidates[0];
+
+      const sdeContent = fs.existsSync(sdePath) ? fs.readFileSync(sdePath, 'utf-8') : '';
+      const aimlContent = fs.existsSync(aimlPath) ? fs.readFileSync(aimlPath, 'utf-8') : '';
+
+      return {
+        success: true,
+        books: [
+          {
+            id: 'sde-handbook',
+            title: 'Official SDE Interview Knowledge Handbook',
+            role: 'sde-interview',
+            fileName: 'SDE_Interview_Official_Handbook.md',
+            path: sdePath,
+            content: sdeContent,
+          },
+          {
+            id: 'aiml-handbook',
+            title: 'Official AI/ML Interview Knowledge Handbook',
+            role: 'aiml-interview',
+            fileName: 'AIML_Interview_Official_Handbook.md',
+            path: aimlPath,
+            content: aimlContent,
+          },
+        ],
+      };
+    } catch (e: any) {
+      console.error('[IPC] knowledge-books:get-books error:', e);
+      return { success: false, error: e?.message || String(e) };
+    }
+  });
+
+  safeHandle('knowledge-books:open-book', async (_, bookId: string) => {
+    try {
+      const sdeCandidates = [
+        path.resolve(__dirname, '../../knowledge-books/SDE_Interview_Official_Handbook.md'),
+        path.resolve(__dirname, '../../resources/knowledge-books/SDE_Interview_Official_Handbook.md'),
+        path.resolve(process.cwd(), 'knowledge-books/SDE_Interview_Official_Handbook.md'),
+      ];
+      const aimlCandidates = [
+        path.resolve(__dirname, '../../knowledge-books/AIML_Interview_Official_Handbook.md'),
+        path.resolve(__dirname, '../../resources/knowledge-books/AIML_Interview_Official_Handbook.md'),
+        path.resolve(process.cwd(), 'knowledge-books/AIML_Interview_Official_Handbook.md'),
+      ];
+
+      const isAiml = bookId === 'aiml-handbook' || bookId === 'aiml' || bookId === 'aiml-interview';
+      const targetPath = (isAiml ? aimlCandidates : sdeCandidates).find((p: string) => fs.existsSync(p));
+
+      if (targetPath && fs.existsSync(targetPath)) {
+        const err = await shell.openPath(targetPath);
+        return err ? { success: false, error: err } : { success: true, path: targetPath };
+      }
+      return { success: false, error: 'Knowledge handbook file not found on disk' };
+    } catch (e: any) {
+      console.error('[IPC] knowledge-books:open-book error:', e);
+      return { success: false, error: e?.message || String(e) };
+    }
+  });
+
   // ── OKF Knowledge Packs (Phase 5 UI) ────────────────────────────
   // All handlers are no-ops (empty result) when okfKnowledgeUi is off, so
   // the renderer can safely call them unconditionally — the UI itself is

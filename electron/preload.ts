@@ -1291,6 +1291,10 @@ interface ElectronAPI {
     modeId: string,
   ) => Promise<{ success: boolean; cancelled?: boolean; file?: any; error?: string }>;
   modesDeleteReferenceFile: (id: string) => Promise<{ success: boolean; error?: string }>;
+  modesOpenReferenceFile: (fileId: string) => Promise<{ success: boolean; path?: string; error?: string }>;
+  modesGetReferenceFileById: (fileId: string) => Promise<{ success: boolean; file?: any; error?: string }>;
+  knowledgeBooksGetBooks: () => Promise<{ success: boolean; books: Array<{ id: string; title: string; role: string; fileName: string; path: string; content: string }>; error?: string }>;
+  knowledgeBooksOpenBook: (bookId: string) => Promise<{ success: boolean; path?: string; error?: string }>;
   modesGetReferenceFileStatus: (
     modeId: string,
   ) => Promise<{ success: boolean; statuses?: Array<{ fileId: string; fileName: string; status: string; chunkCount: number }>; error?: string }>;
@@ -3283,6 +3287,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   modesUploadReferenceFile: (modeId: string) =>
     ipcRenderer.invoke('modes:upload-reference-file', modeId),
   modesDeleteReferenceFile: (id: string) => ipcRenderer.invoke('modes:delete-reference-file', id),
+  modesOpenReferenceFile: (fileId: string) => ipcRenderer.invoke('modes:open-reference-file', fileId),
+  modesGetReferenceFileById: (fileId: string) => ipcRenderer.invoke('modes:get-reference-file-by-id', fileId),
+  knowledgeBooksGetBooks: () => ipcRenderer.invoke('knowledge-books:get-books'),
+  knowledgeBooksOpenBook: (bookId: string) => ipcRenderer.invoke('knowledge-books:open-book', bookId),
   modesGetReferenceFileStatus: (modeId: string) =>
     ipcRenderer.invoke('modes:get-reference-file-status', modeId),
   onModeFileIndexStatus: (callback: (data: { modeId: string; fileId: string; phase: 'indexing' | 'done' }) => void) => {

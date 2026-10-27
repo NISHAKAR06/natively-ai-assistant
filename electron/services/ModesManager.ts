@@ -735,6 +735,9 @@ export class ModesManager {
                     + `${complete ? '' : ' — INCOMPLETE, will retry'}`);
                 this.invalidateActiveModeCache();
             }
+
+            // Ensure official interview handbooks are attached to SDE and AI/ML interview modes
+            this.ensureOfficialKnowledgeBooks();
         } catch (e) {
             // Never fatal: a failure here leaves every mode custom, which is the
             // pre-v26 behaviour, not a broken app.
@@ -742,6 +745,65 @@ export class ModesManager {
             console.error('[ModesManager] ensureBuiltinModes failed:', e);
         }
         return complete;
+    }
+
+    /**
+     * Seeds the official interview handbooks into sde-interview and aiml-interview modes if missing.
+     */
+    public ensureOfficialKnowledgeBooks(): void {
+        try {
+            const db = DatabaseManager.getInstance();
+            const modes = db.getModes().map(rowToMode);
+            const fs = require('fs');
+            const path = require('path');
+
+            const sdeMode = modes.find(m => m.templateType === 'sde-interview');
+            const aimlMode = modes.find(m => m.templateType === 'aiml-interview');
+
+            const candidates = [
+                path.resolve(__dirname, '../../knowledge-books/SDE_Interview_Official_Handbook.md'),
+                path.resolve(__dirname, '../../resources/knowledge-books/SDE_Interview_Official_Handbook.md'),
+                path.resolve(process.cwd(), 'knowledge-books/SDE_Interview_Official_Handbook.md'),
+                path.resolve(process.cwd(), 'resources/knowledge-books/SDE_Interview_Official_Handbook.md'),
+            ];
+            const sdePath = candidates.find((p: string) => fs.existsSync(p));
+
+            const aimlCandidates = [
+                path.resolve(__dirname, '../../knowledge-books/AIML_Interview_Official_Handbook.md'),
+                path.resolve(__dirname, '../../resources/knowledge-books/AIML_Interview_Official_Handbook.md'),
+                path.resolve(process.cwd(), 'knowledge-books/AIML_Interview_Official_Handbook.md'),
+                path.resolve(process.cwd(), 'resources/knowledge-books/AIML_Interview_Official_Handbook.md'),
+            ];
+            const aimlPath = aimlCandidates.find((p: string) => fs.existsSync(p));
+
+            if (sdeMode && sdePath) {
+                const existingFiles = this.getReferenceFiles(sdeMode.id);
+                if (!existingFiles.some(f => f.fileName.includes('SDE_Interview_Official_Handbook'))) {
+                    const content = fs.readFileSync(sdePath, 'utf-8');
+                    this.addReferenceFile({
+                        modeId: sdeMode.id,
+                        fileName: 'SDE_Interview_Official_Handbook.md',
+                        content,
+                    });
+                    console.log('[ModesManager] Attached SDE_Interview_Official_Handbook.md to sde-interview mode');
+                }
+            }
+
+            if (aimlMode && aimlPath) {
+                const existingFiles = this.getReferenceFiles(aimlMode.id);
+                if (!existingFiles.some(f => f.fileName.includes('AIML_Interview_Official_Handbook'))) {
+                    const content = fs.readFileSync(aimlPath, 'utf-8');
+                    this.addReferenceFile({
+                        modeId: aimlMode.id,
+                        fileName: 'AIML_Interview_Official_Handbook.md',
+                        content,
+                    });
+                    console.log('[ModesManager] Attached AIML_Interview_Official_Handbook.md to aiml-interview mode');
+                }
+            }
+        } catch (e: any) {
+            console.warn('[ModesManager] ensureOfficialKnowledgeBooks failed (non-fatal):', e?.message || e);
+        }
     }
 
     /** Test seam: clear the once-per-process latch so a run can be repeated. */

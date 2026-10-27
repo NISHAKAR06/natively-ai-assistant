@@ -1,12 +1,13 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useStreamBuffer } from '../hooks/useStreamBuffer';
-import { X, Copy, Check, Globe, ArrowUp } from 'lucide-react';
+import { X, Copy, Check, Globe, ArrowUp, BookOpen } from 'lucide-react';
 import { DiagramAwareMarkdown } from './diagram/DiagramAwareMarkdown';
 import { motion, AnimatePresence } from 'framer-motion';
 import { genMessageId } from '../utils/messageId';
 import nativelyIcon from './icon.png';
 import { useResolvedTheme } from '../hooks/useResolvedTheme';
 import { stripGistTrailer } from '../lib/displayMarkup';
+import { FileViewerModal } from './ui/FileViewerModal';
 
 // ============================================
 // Types
@@ -150,6 +151,40 @@ const GlobalChatOverlay: React.FC<GlobalChatOverlayProps> = ({
     const [chatState, setChatState] = useState<ChatState>('idle');
     const [errorMessage, setErrorMessage] = useState<string | null>(null);
     const [query, setQuery] = useState('');
+    const [viewingFile, setViewingFile] = useState<{
+        isOpen: boolean;
+        title: string;
+        fileName: string;
+        content: string;
+        bookId?: string;
+    } | null>(null);
+
+    const handleOpenHandbook = async (bookId: 'sde-handbook' | 'aiml-handbook') => {
+        const api = (window as any).electronAPI;
+        if (!api?.knowledgeBooksGetBooks) return;
+        try {
+            const res = await api.knowledgeBooksGetBooks();
+            if (res?.success && Array.isArray(res.books)) {
+                const found = res.books.find(
+                    (b: any) =>
+                        b.id === bookId ||
+                        (bookId.includes('sde') && b.id.includes('sde')) ||
+                        (bookId.includes('aiml') && b.id.includes('aiml'))
+                );
+                if (found) {
+                    setViewingFile({
+                        isOpen: true,
+                        title: found.title,
+                        fileName: found.fileName,
+                        content: found.content,
+                        bookId: found.id,
+                    });
+                }
+            }
+        } catch {
+            // ignore
+        }
+    };
     const streamBuffer = useStreamBuffer();
     // Match the meeting chat overlay / modes manager --mm-bg exactly so
     // the expanded card looks like the same dark grey surface.
@@ -550,12 +585,31 @@ const GlobalChatOverlay: React.FC<GlobalChatOverlayProps> = ({
                                 <img src={nativelyIcon} className="w-3.5 h-3.5 force-black-icon opacity-50" alt="logo" />
                                 <span className="text-[13px] font-medium">Search all meetings</span>
                             </div>
-                            <button
-                                onClick={onClose}
-                                className="p-2 transition-colors group"
-                            >
-                                <X size={16} className="text-text-tertiary group-hover:text-red-500 group-hover:drop-shadow-[0_0_8px_rgba(239,68,68,0.5)] transition-all duration-300" />
-                            </button>
+                            <div className="flex items-center gap-2">
+                                <button
+                                    onClick={() => void handleOpenHandbook('sde-handbook')}
+                                    className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border border-cyan-500/30 bg-cyan-500/10 text-cyan-300 hover:bg-cyan-500/20 transition-all cursor-pointer"
+                                    title="View Official SDE Interview Handbook (DSA, System Design, W3Schools Q&A)"
+                                >
+                                    <BookOpen size={12} />
+                                    <span>SDE Book</span>
+                                </button>
+                                <button
+                                    onClick={() => void handleOpenHandbook('aiml-handbook')}
+                                    className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border border-purple-500/30 bg-purple-500/10 text-purple-300 hover:bg-purple-500/20 transition-all cursor-pointer"
+                                    title="View Official AI/ML Interview Handbook (Deep Learning, LLMs, PyTorch, W3Schools Q&A)"
+                                >
+                                    <BookOpen size={12} />
+                                    <span>AI/ML Book</span>
+                                </button>
+                                <button
+                                    onClick={onClose}
+                                    className="p-1.5 text-text-tertiary hover:text-red-400 transition-colors"
+                                    title="Close"
+                                >
+                                    <X size={16} />
+                                </button>
+                            </div>
                         </div>
 
                         {/* Messages area - scrollable */}
@@ -609,6 +663,17 @@ const GlobalChatOverlay: React.FC<GlobalChatOverlayProps> = ({
                         </div>
                     </motion.div>
                 </motion.div>
+            )}
+
+            {viewingFile && (
+                <FileViewerModal
+                    isOpen={viewingFile.isOpen}
+                    onClose={() => setViewingFile(null)}
+                    title={viewingFile.title}
+                    fileName={viewingFile.fileName}
+                    content={viewingFile.content}
+                    bookId={viewingFile.bookId}
+                />
             )}
         </AnimatePresence>
     );

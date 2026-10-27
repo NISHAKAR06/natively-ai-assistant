@@ -2263,6 +2263,16 @@ export class DatabaseManager {
         }
     }
 
+    public getReferenceFileById(fileId: string): any {
+        if (!this.db) return null;
+        try {
+            return this.db.prepare('SELECT * FROM mode_reference_files WHERE id = ?').get(fileId) || null;
+        } catch (e) {
+            console.error('[DatabaseManager] getReferenceFileById failed:', e);
+            return null;
+        }
+    }
+
     public addReferenceFile(file: {
         id: string;
         modeId: string;

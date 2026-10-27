@@ -4,8 +4,9 @@ import {
     Building2, Search, AlertCircle, AlertTriangle, Gift, Info, Star,
     User, CheckCircle, ArrowUpRight, ChevronRight, Paperclip, FileText,
     GraduationCap, FolderKanban, Layers, Mail, MessageSquare, Target,
-    Edit3, Save, Github, Code, ExternalLink, Plus, Sparkles,
+    Edit3, Save, Github, Code, ExternalLink, Plus, Sparkles, Eye, BookOpen,
 } from 'lucide-react';
+import { FileViewerModal } from './ui/FileViewerModal';
 import { ThinkingOrb } from 'thinking-orbs';
 import { useToggleInit } from './settings/useToggleInit';
 import { RoleInsightPanel } from '../premium';
@@ -2079,10 +2080,83 @@ export function ProfileIntelligenceSettings({
 
     // ── Role Track (SDE vs. AI/ML) Preparation Files ──
     const [roleTrack, setRoleTrack] = useState<'sde-interview' | 'aiml-interview'>('sde-interview');
-    const [roleTrackFiles, setRoleTrackFiles] = useState<Array<{ id: string; fileName: string; pageCount?: number }>>([]);
+    const [roleTrackFiles, setRoleTrackFiles] = useState<Array<{ id: string; fileName: string; pageCount?: number; content?: string }>>([]);
     const [isUploadingRoleFile, setIsUploadingRoleFile] = useState(false);
     const [roleTrackStatus, setRoleTrackStatus] = useState<string | null>(null);
     const [activeModeId, setActiveModeId] = useState<string | null>(null);
+    const [viewingFile, setViewingFile] = useState<{
+        isOpen: boolean;
+        title: string;
+        fileName: string;
+        content: string;
+        fileId?: string;
+        bookId?: string;
+    } | null>(null);
+
+    const handleViewOfficialHandbook = async (track: 'sde-interview' | 'aiml-interview') => {
+        const api = (window as any).electronAPI;
+        if (!api?.knowledgeBooksGetBooks) return;
+        try {
+            const res = await api.knowledgeBooksGetBooks();
+            if (res?.success && Array.isArray(res.books)) {
+                const bookId = track === 'sde-interview' ? 'sde-handbook' : 'aiml-handbook';
+                const found = res.books.find(
+                    (b: any) =>
+                        b.id === bookId ||
+                        (track === 'sde-interview' && b.id.includes('sde')) ||
+                        (track === 'aiml-interview' && b.id.includes('aiml'))
+                );
+                if (found) {
+                    setViewingFile({
+                        isOpen: true,
+                        title: found.title,
+                        fileName: found.fileName,
+                        content: found.content,
+                        bookId: found.id,
+                    });
+                }
+            }
+        } catch {
+            // ignore
+        }
+    };
+
+    const handleViewRoleFile = async (f: { id: string; fileName: string; content?: string }) => {
+        let content = f.content;
+        if (!content) {
+            const api = (window as any).electronAPI;
+            if (api?.modesGetReferenceFileById) {
+                const res = await api.modesGetReferenceFileById(f.id);
+                if (res?.success && res.file?.content) {
+                    content = res.file.content;
+                }
+            }
+        }
+        setViewingFile({
+            isOpen: true,
+            title: f.fileName,
+            fileName: f.fileName,
+            content: content || '_(No text content preview available)_',
+            fileId: f.id,
+        });
+    };
+
+    const handleOpenRoleFileNative = async (fileId: string) => {
+        const api = (window as any).electronAPI;
+        if (!api?.modesOpenReferenceFile) return;
+        try {
+            const res = await api.modesOpenReferenceFile(fileId);
+            if (res?.success) {
+                setRoleTrackStatus('Opened on Desktop!');
+                setTimeout(() => setRoleTrackStatus(null), 2500);
+            } else if (res?.error) {
+                setRoleTrackStatus(`Open error: ${res.error}`);
+                setTimeout(() => setRoleTrackStatus(null), 3000);
+            }
+        } catch {
+            // ignore
+        }
+    };
 
     const loadRoleTrackFiles = useCallback(async (track: 'sde-interview' | 'aiml-interview') => {
         try {
@@ -3503,6 +3577,29 @@ export function ProfileIntelligenceSettings({
                             <button
                                 type="button"
                                 className="pi-press"
+                                onClick={() => void handleViewOfficialHandbook(roleTrack)}
+                                style={{
+                                    fontSize: 11,
+                                    fontWeight: 600,
+                                    padding: '5px 11px',
+                                    borderRadius: 'var(--pi-r-pill)',
+                                    border: '1px solid rgba(16, 185, 129, 0.4)',
+                                    background: 'rgba(16, 185, 129, 0.12)',
+                                    color: '#34d399',
+                                    cursor: 'pointer',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: 5,
+                                }}
+                                title="Read Official Knowledge Handbook (W3Schools Q&A + Spoken Answers)"
+                            >
+                                <BookOpen size={11} />
+                                View Handbook
+                            </button>
+
+                            <button
+                                type="button"
+                                className="pi-press"
                                 disabled={isUploadingRoleFile}
                                 onClick={handleUploadRoleFile}
                                 style={{
@@ -3570,17 +3667,41 @@ export function ProfileIntelligenceSettings({
                                             <span style={{ color: 'var(--pi-tertiary)', fontSize: 10 }}>({f.pageCount} pages)</span>
                                         ) : null}
                                     </div>
-                                    <button
-                                        type="button"
-                                        className="pi-press-soft"
-                                        onClick={() => handleDeleteRoleFile(f.id)}
-                                        style={{ background: 'none', border: 'none', color: 'var(--pi-tertiary)', padding: 3, cursor: 'pointer', borderRadius: 4 }}
-                                        onMouseEnter={e => (e.currentTarget.style.color = 'var(--pi-danger)')}
-                                        onMouseLeave={e => (e.currentTarget.style.color = 'var(--pi-tertiary)')}
-                                        title="Remove file"
-                                    >
-                                        <Trash2 size={12} />
-                                    </button>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
+                                        <button
+                                            type="button"
+                                            className="pi-press-soft"
+                                            onClick={() => void handleViewRoleFile(f)}
+                                            style={{ background: 'none', border: 'none', color: 'var(--pi-tertiary)', padding: 3, cursor: 'pointer', borderRadius: 4 }}
+                                            onMouseEnter={e => (e.currentTarget.style.color = 'var(--pi-primary)')}
+                                            onMouseLeave={e => (e.currentTarget.style.color = 'var(--pi-tertiary)')}
+                                            title="View / Preview file in App"
+                                        >
+                                            <Eye size={12} />
+                                        </button>
+                                        <button
+                                            type="button"
+                                            className="pi-press-soft"
+                                            onClick={() => void handleOpenRoleFileNative(f.id)}
+                                            style={{ background: 'none', border: 'none', color: 'var(--pi-tertiary)', padding: 3, cursor: 'pointer', borderRadius: 4 }}
+                                            onMouseEnter={e => (e.currentTarget.style.color = 'var(--pi-primary)')}
+                                            onMouseLeave={e => (e.currentTarget.style.color = 'var(--pi-tertiary)')}
+                                            title="Open on Desktop (VS Code / Notepad)"
+                                        >
+                                            <ExternalLink size={12} />
+                                        </button>
+                                        <button
+                                            type="button"
+                                            className="pi-press-soft"
+                                            onClick={() => handleDeleteRoleFile(f.id)}
+                                            style={{ background: 'none', border: 'none', color: 'var(--pi-tertiary)', padding: 3, cursor: 'pointer', borderRadius: 4 }}
+                                            onMouseEnter={e => (e.currentTarget.style.color = 'var(--pi-danger)')}
+                                            onMouseLeave={e => (e.currentTarget.style.color = 'var(--pi-tertiary)')}
+                                            title="Remove file"
+                                        >
+                                            <Trash2 size={12} />
+                                        </button>
+                                    </div>
                                 </div>
                             ))}
                         </div>
@@ -4811,6 +4932,18 @@ export function ProfileIntelligenceSettings({
                     </div>
                 </div>
             </div>
+
+            {viewingFile && (
+                <FileViewerModal
+                    isOpen={viewingFile.isOpen}
+                    onClose={() => setViewingFile(null)}
+                    title={viewingFile.title}
+                    fileName={viewingFile.fileName}
+                    content={viewingFile.content}
+                    fileId={viewingFile.fileId}
+                    bookId={viewingFile.bookId}
+                />
+            )}
         </div>
     );
 }
