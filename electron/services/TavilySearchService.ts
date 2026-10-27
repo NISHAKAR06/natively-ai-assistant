@@ -21,6 +21,39 @@ export interface TavilySearchResponse {
   formattedResearch: string;
 }
 
+export const SDE_OFFICIAL_DOMAINS = [
+  'geeksforgeeks.org',
+  'w3schools.com',
+  'docs.python.org',
+  'developer.mozilla.org',
+  'en.wikipedia.org',
+  'martinfowler.com',
+  'postgresql.org',
+  'dev.mysql.com',
+  'docs.oracle.com',
+  'kubernetes.io',
+  'docker.com',
+  'spring.io',
+  'learn.microsoft.com',
+  'refactoring.guru',
+];
+
+export const AIML_OFFICIAL_DOMAINS = [
+  'geeksforgeeks.org',
+  'w3schools.com',
+  'pytorch.org',
+  'tensorflow.org',
+  'scikit-learn.org',
+  'huggingface.co',
+  'docs.python.org',
+  'deeplearning.ai',
+  'en.wikipedia.org',
+  'arxiv.org',
+  'numpy.org',
+  'pandas.pydata.org',
+  'fast.ai',
+];
+
 interface CacheEntry {
   timestamp: number;
   data: TavilySearchResponse;
@@ -55,7 +88,7 @@ export class TavilySearchService {
   }
 
   /**
-   * Search Tavily with timeout protection and structured results.
+   * Search Tavily with timeout protection, official domain filtering, and structured results.
    */
   public async search(
     query: string,
@@ -64,6 +97,7 @@ export class TavilySearchService {
       searchDepth?: 'basic' | 'advanced';
       timeoutMs?: number;
       includeAnswer?: boolean;
+      includeDomains?: string[];
     }
   ): Promise<TavilySearchResponse | null> {
     const apiKey = this.getApiKey();
@@ -72,7 +106,8 @@ export class TavilySearchService {
     const trimmedQuery = (query || '').trim();
     if (!trimmedQuery) return null;
 
-    const cacheKey = `${trimmedQuery.toLowerCase()}_${options?.searchDepth || 'basic'}_${options?.maxResults || 3}`;
+    const domainHash = options?.includeDomains ? options.includeDomains.slice(0, 3).join(',') : 'all';
+    const cacheKey = `${trimmedQuery.toLowerCase()}_${options?.searchDepth || 'basic'}_${options?.maxResults || 3}_${domainHash}`;
     const cached = this.cache.get(cacheKey);
     if (cached && Date.now() - cached.timestamp < this.CACHE_TTL_MS) {
       return cached.data;
@@ -84,11 +119,18 @@ export class TavilySearchService {
       const { tavily } = require('@tavily/core');
       const client = tavily({ apiKey });
 
-      const searchPromise = client.search(trimmedQuery, {
+      const searchParams: any = {
         searchDepth: options?.searchDepth || 'basic',
         maxResults: options?.maxResults || 3,
         includeAnswer: options?.includeAnswer ?? true,
-      });
+      };
+
+      if (options?.includeDomains && options.includeDomains.length > 0) {
+        searchParams.includeDomains = options.includeDomains;
+        searchParams.includeDomainsMode = 'prefer';
+      }
+
+      const searchPromise = client.search(trimmedQuery, searchParams);
 
       const timeoutPromise = new Promise<never>((_, reject) =>
         setTimeout(() => reject(new Error(`Tavily search timed out after ${timeoutMs}ms`)), timeoutMs)
@@ -122,9 +164,14 @@ export class TavilySearchService {
   }
 
   /**
-   * Specific search method optimized for live interview technical questions.
+   * Specific search method optimized for live interview technical questions,
+   * strictly retrieving from authoritative official documentation and verified pages.
    */
-  public async searchForInterview(query: string, timeoutMs: number = 2500): Promise<TavilySearchResponse | null> {
+  public async searchForInterview(
+    query: string,
+    timeoutMs: number = 2500,
+    role?: 'sde' | 'aiml' | 'sde-interview' | 'aiml-interview' | string
+  ): Promise<TavilySearchResponse | null> {
     if (!this.hasApiKey()) return null;
 
     // Clean question to form a clear technical search query
@@ -135,11 +182,24 @@ export class TavilySearchService {
 
     const searchQuery = cleaned.length >= 3 ? cleaned : query;
 
+    let includeDomains: string[] | undefined;
+    const isSde = role === 'sde' || role === 'sde-interview';
+    const isAiml = role === 'aiml' || role === 'aiml-interview';
+
+    if (isSde) {
+      includeDomains = SDE_OFFICIAL_DOMAINS;
+    } else if (isAiml) {
+      includeDomains = AIML_OFFICIAL_DOMAINS;
+    } else {
+      includeDomains = ['geeksforgeeks.org', 'w3schools.com', 'docs.python.org', 'developer.mozilla.org', 'pytorch.org'];
+    }
+
     return await this.search(searchQuery, {
-      maxResults: 3,
+      maxResults: 4,
       searchDepth: 'basic',
       timeoutMs,
       includeAnswer: true,
+      includeDomains,
     });
   }
 
@@ -147,12 +207,16 @@ export class TavilySearchService {
     if (!results || results.length === 0) return '';
 
     const lines: string[] = [
-      '# VERIFIED WEB RESEARCH SOURCES (via Tavily Search):',
-      'Cite these sources inline using markdown citation links: [[1](url), [2](url)] corresponding to the source number.',
+      '# VERIFIED OFFICIAL DOCUMENTATION SOURCES (Retrieved via Tavily Search):',
+      'CRITICAL: Ground your technical response strictly on these verified official documentation sources and official pages (e.g. GeeksforGeeks, W3Schools, Python/PyTorch/MDN docs).',
+      'Do NOT make up facts or unverified assertions.',
+      'Explain the concept in simple, conversational, humanized spoken English that the user can comfortably speak to the interviewer.',
+      'Include a clear practical example and clean code/SQL.',
+      'Cite these official sources inline using markdown citation links: [[1](url), [2](url)] corresponding to the source number.',
     ];
 
     if (answer) {
-      lines.push(`\nSummary Insights: ${answer.trim()}\n`);
+      lines.push(`\nAuthoritative Summary: ${answer.trim()}\n`);
     }
 
     results.forEach((r, idx) => {
@@ -160,7 +224,7 @@ export class TavilySearchService {
       lines.push(`Source [${num}]:`);
       lines.push(`Title: ${r.title}`);
       lines.push(`URL: ${r.url}`);
-      lines.push(`Summary: ${r.content.slice(0, 350)}`);
+      lines.push(`Content: ${r.content.slice(0, 450)}`);
       lines.push('');
     });
 

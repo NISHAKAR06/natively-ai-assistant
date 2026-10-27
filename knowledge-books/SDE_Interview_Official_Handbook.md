@@ -291,3 +291,63 @@ Agile is an iterative, incremental model where software is developed in short 1 
 **Spoken Answer:**
 "A database index is a specialized data structure—typically a B-Tree—that holds a sorted copy of specific columns along with pointers to the full physical table rows.
 Without an index, the database must perform a full table scan ($O(N)$), inspecting every disk block. With a B-Tree index, the database navigates directly to matching rows via binary branch traversals in $O(\log N)$ disk I/O operations, dramatically speeding up `WHERE`, `JOIN`, and `ORDER BY` operations at the cost of slightly slower writes and extra disk space."
+
+---
+
+## 9. GeeksforGeeks Software Engineering Interview Questions & Spoken Answers
+*Official Reference: [GeeksforGeeks Software Engineering Interview Questions](https://www.geeksforgeeks.org/software-engineering/software-engineering-interview-questions-and-answers/)*
+
+### Q1: What is Software Engineering, and how does it differ from traditional programming?
+**Spoken Answer:**
+"Software engineering is the systematic, disciplined, and quantified approach to the design, development, operation, and maintenance of software systems. While simple programming focuses primarily on writing code to solve a single immediate problem, software engineering encompasses the entire software life cycle—including requirement analysis, architectural scalability, unit and integration testing, continuous deployment, and long-term maintainability."
+
+### Q2: What is the difference between Functional and Non-Functional Requirements?
+**Spoken Answer:**
+"Functional requirements specify *what* the system must do—the core business features, user inputs, calculations, and behaviors, like 'Users must be able to log in with OAuth2' or 'System must process credit card payments.'
+Non-functional requirements describe *how* the system performs those functions—addressing quality attributes like performance, scalability, security, availability, and reliability, such as 'API response latency must be under 100 milliseconds at p99' or 'The system must guarantee 99.99% uptime with TLS 1.3 encryption.'"
+
+### Q3: Explain Cohesion and Coupling. What is the ideal software design?
+**Spoken Answer:**
+"In clean software architecture, the goal is always **High Cohesion and Loose Coupling**.
+- **Cohesion** measures the degree to which elements within a single module or class belong together. In a high-cohesion module, every function and field is focused on executing a single, well-defined purpose (Single Responsibility Principle).
+- **Coupling** measures the degree of direct inter-dependence between different modules. Tight coupling means changing one class breaks several others. Loose coupling means modules interact only through minimal, abstract interfaces without exposing internal implementation details.
+For example, in microservices, an Authentication Service and an Order Processing Service should communicate asynchronously via REST or event streams (loose coupling), rather than directly querying each other's private databases."
+
+### Q4: What is the difference between Verification and Validation?
+**Spoken Answer:**
+"The classic mnemonic is:
+- **Verification:** *'Are we building the product right?'* It is a static quality assurance process checking specifications, architecture designs, and code reviews without executing the code. It ensures we conform to documented technical standards.
+- **Validation:** *'Are we building the right product?'* It is a dynamic quality control process involving active execution of the software, such as integration testing and user acceptance testing (UAT), to verify that the application satisfies actual customer business requirements."
+
+### Q5: What is the difference between Black-Box and White-Box Testing?
+**Spoken Answer:**
+"White-Box testing (structural testing) tests internal code logic, branch coverage, loop execution, and code structure with full visibility of the source code. It is typically conducted by developers using unit test frameworks like JUnit or pytest.
+Black-Box testing evaluates the software purely against functional specifications from the external user's perspective, without knowing internal code paths. Test cases are designed around inputs, expected outputs, boundary values, and equivalence classes."
+
+### Q6: What is the difference between Alpha Testing and Beta Testing?
+**Spoken Answer:**
+"Alpha testing is conducted internally by in-house developers and QA engineers in a controlled lab or staging environment before the software is released to any public audience.
+Beta testing is conducted by real end-users in their own live production environments. It gathers authentic real-world feedback, uncovers edge cases across varied hardware configurations, and evaluates usability prior to general availability."
+
+### Q7: What are the 4 Types of Software Maintenance?
+**Spoken Answer:**
+"In production engineering, software maintenance represents up to 70% of total lifecycle cost and is divided into four distinct categories:
+1. **Corrective Maintenance:** Diagnosing and fixing bugs, defects, and runtime crashes reported in production.
+2. **Adaptive Maintenance:** Modifying the system to stay compatible with evolving external environments, such as updating to Python 3.12, migrating to ARM64 cloud instances, or updating deprecated database drivers.
+3. **Perfective Maintenance:** Enhancing performance, refining the UI, or adding new features based on user feedback.
+4. **Preventive Maintenance:** Proactive refactoring, updating dependencies with known CVE security vulnerabilities, improving code documentation, and eliminating technical debt before issues cause production outages."
+
+### Q8: What is Software Re-engineering vs Reverse Engineering?
+**Spoken Answer:**
+"Reverse engineering is the analytical process of examining an existing compiled or legacy system to deduce its underlying architectural design, data structures, and operational logic when documentation is missing.
+Software re-engineering takes a legacy system and reorganizes, modernizes, and restructures its code base—such as migrating a monolithic application to event-driven microservices—to improve maintainability, speed, and reliability while preserving core business behavior."
+
+### Q9: How do you design and refactor code to eliminate Technical Debt?
+**Spoken Answer:**
+"Technical debt represents the future development cost incurred by choosing an expedient, quick-and-dirty hack today instead of an architecturally sound solution.
+To manage and eliminate technical debt in an engineering team:
+1. Adhere to SOLID principles and write modular, testable code with high unit test coverage.
+2. Practice Continuous Refactoring: adopt the Boy Scout rule to leave every file cleaner than you found it.
+3. Establish automated CI/CD static analysis checks (linters, SonarQube, type checkers) to prevent code smells and security vulnerabilities from merging.
+4. Dedicate 15-20% of sprint capacity to technical backlog debt reduction, database query optimization, and infrastructure modernization."
+

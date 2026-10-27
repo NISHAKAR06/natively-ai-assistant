@@ -729,9 +729,12 @@ Generate a cohesive, highly articulate, confident first-person interview answer:
                 if (isCandidateQuery) return null;
                 try {
                     const { TavilySearchService } = require('../services/TavilySearchService');
+                    const { ModesManager } = require('../services/ModesManager');
+                    const activeMode = ModesManager.getInstance().getActiveMode();
+                    const role = activeMode?.templateType?.includes('aiml') ? 'aiml' : activeMode?.templateType?.includes('sde') ? 'sde' : undefined;
                     const tavily = TavilySearchService.getInstance();
                     if (tavily.hasApiKey()) {
-                        return await tavily.searchForInterview(resolvedQuery, 2500);
+                        return await tavily.searchForInterview(resolvedQuery, 2500, role);
                     }
                 } catch (e: any) {
                     console.warn('[RAGManager] Tavily interview search error (non-fatal):', e?.message || e);

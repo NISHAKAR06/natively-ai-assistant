@@ -269,3 +269,73 @@ RAG eliminates LLM hallucinations, enables real-time access to private enterpris
 **Spoken Answer:**
 "Bagging (Bootstrap Aggregating), used in Random Forests, trains multiple independent base models in parallel on random bootstrap samples of the data and averages their predictions to decrease **variance**.
 Boosting, used in XGBoost and LightGBM, trains models sequentially where each new model focuses specifically on correcting the residual errors made by the previous models, primarily decreasing **bias**."
+
+---
+
+## 9. GeeksforGeeks Machine Learning Interview Questions & Spoken Answers
+*Official Reference: [GeeksforGeeks Machine Learning Interview Questions](https://www.geeksforgeeks.org/machine-learning/machine-learning-interview-questions/)*
+
+### Q1: Explain the difference between AI, Machine Learning, Deep Learning, and Data Science.
+**Spoken Answer:**
+"Artificial Intelligence is the broad umbrella discipline focused on creating systems capable of performing tasks that typically require human cognition.
+Machine Learning is a subset of AI where algorithms learn statistical patterns and decision boundaries directly from data without being explicitly hand-coded.
+Deep Learning is a specialized sub-branch of Machine Learning powered by multi-layered neural networks (like Transformers and CNNs) capable of learning hierarchical feature representations from high-dimensional unstructured data like images, audio, and text.
+Data Science is an interdisciplinary field that spans data engineering, statistical modeling, machine learning, and business intelligence to derive actionable insights from raw data across the entire lifecycle."
+
+### Q2: What is the difference between a Loss Function and a Cost Function?
+**Spoken Answer:**
+"A **Loss Function** computes the error or penalty for a single training observation $L(\hat{y}^{(i)}, y^{(i)})$, such as binary cross-entropy on one email prediction.
+A **Cost Function** is the cumulative, aggregate metric calculated over the entire dataset or mini-batch: $J(W, b) = \frac{1}{m} \sum_{i=1}^m L(\hat{y}^{(i)}, y^{(i)}) + \lambda \Omega(W)$, including any regularization penalties. In optimization, our gradient descent algorithms update model parameters to minimize the Cost Function."
+
+### Q3: Compare Batch Gradient Descent, Stochastic Gradient Descent (SGD), and Mini-Batch Gradient Descent.
+**Spoken Answer:**
+"1. **Batch Gradient Descent:** Computes gradients across the entire dataset before making a single parameter update. It produces smooth, deterministic convergence, but is computationally intractable for large datasets and easily gets trapped in saddle points.
+2. **Stochastic Gradient Descent (SGD):** Updates model parameters after evaluating each individual training instance. It is fast and introduces stochastic noise that helps escape local minima, but oscillates heavily around the global minimum.
+3. **Mini-Batch Gradient Descent:** Computes gradients over small randomized batches (typically 32 to 256 samples). It combines the computational speed of GPU matrix vectorization with the regularization benefit of noise, making it the industry standard for training deep neural networks."
+
+### Q4: Explain the Confusion Matrix and its Derived Metrics.
+**Spoken Answer:**
+"A Confusion Matrix summarizes the classification performance of a model across 4 quadrants:
+- **True Positives (TP):** Correctly predicted positive instances.
+- **True Negatives (TN):** Correctly predicted negative instances.
+- **False Positives (FP - Type I Error):** Negative instances incorrectly flagged as positive.
+- **False Negatives (FN - Type II Error):** Real positive instances missed by the model.
+
+From these, we derive:
+- $\text{Accuracy} = \frac{TP + TN}{TP + TN + FP + FN}$ (Misleading when classes are imbalanced).
+- $\text{Precision} = \frac{TP}{TP + FP}$ (Quality of positive predictions).
+- $\text{Recall / Sensitivity} = \frac{TP}{TP + FN}$ (Completeness of identifying actual positives).
+- $\text{F1-Score} = 2 \times \frac{\text{Precision} \times \text{Recall}}{\text{Precision} + \text{Recall}}$ (Harmonic mean, penalizing extreme trade-offs between precision and recall)."
+
+### Q5: What is an ROC Curve and AUC Score? How do you interpret them?
+**Spoken Answer:**
+"The **Receiver Operating Characteristic (ROC) curve** is a graphical plot of the True Positive Rate (Recall) on the y-axis against the False Positive Rate ($1 - \text{Specificity}$) on the x-axis across every possible classification probability threshold from 0 to 1.
+The **AUC (Area Under the Curve)** summarizes this performance into a single scalar between 0 and 1:
+- An $\text{AUC} = 1.0$ indicates a perfect classifier with zero overlap between positive and negative distributions.
+- An $\text{AUC} = 0.5$ represents a useless classifier equivalent to random guessing.
+- AUC is particularly valuable because it evaluates model discrimination across all thresholds and is invariant to arbitrary scale choices."
+
+### Q6: How do Decision Trees, Random Forests, and Gradient Boosting (XGBoost) compare?
+**Spoken Answer:**
+"A **Decision Tree** creates orthogonal splits on feature thresholds. It is highly interpretable, but high-variance and prone to severe overfitting on noisy data.
+A **Random Forest** is an ensemble bagging method that builds hundreds of deep, unpruned decision trees in parallel. Each tree is trained on a random bootstrap sample with a random subset of features at each split. Averaging their predictions significantly reduces **variance**.
+**Gradient Boosting (XGBoost/LightGBM)** is an ensemble boosting method that builds trees sequentially. Each subsequent shallow tree is trained to predict the pseudo-residuals (negative gradient of the loss) left by all preceding trees. It reduces **bias** and typically achieves top accuracy on tabular structured data."
+
+### Q7: Explain Dimensionality Reduction: PCA vs t-SNE.
+**Spoken Answer:**
+"**PCA (Principal Component Analysis)** is an unsupervised linear technique. It performs eigenvalue decomposition on the data's covariance matrix to identify orthogonal axes (Principal Components) that capture the maximum variance. It is computationally fast, deterministic, preserves global data geometry, and is ideal for feature extraction before feeding into linear models.
+**t-SNE (t-Distributed Stochastic Neighbor Embedding)** is a non-linear, probabilistic technique. It converts Euclidean distances between data points into conditional probabilities and minimizes the Kullback-Leibler (KL) divergence between high-dimensional and low-dimensional representations using a Student-t distribution. It excels at visualizing complex non-linear clusters in 2D or 3D, but does not preserve global distances and cannot be used to transform new unseen test data."
+
+### Q8: How do you handle Imbalanced Datasets in Production ML?
+**Spoken Answer:**
+"In real-world fraud detection or disease classification, positive cases may represent less than 1% of the data. To handle this:
+1. **Data-Level Sampling:** Use SMOTE (Synthetic Minority Over-sampling Technique) to interpolate synthetic minority examples, or Tomek links to remove borderline majority instances.
+2. **Algorithm-Level Cost Adjustment:** Pass `class_weight='balanced'` in scikit-learn or XGBoost to scale the loss penalty inversely proportional to class frequencies, forcing the gradient descent to focus on minority errors.
+3. **Loss Functions:** Use Focal Loss in deep learning, which adds a modulating factor $(1 - p_t)^\gamma$ to down-weight easy, well-classified background examples.
+4. **Evaluation:** Strictly reject accuracy; optimize against Precision-Recall AUC (PR-AUC) and Macro F1."
+
+### Q9: Explain Data Drift vs Concept Drift in Production MLOps.
+**Spoken Answer:**
+"In production MLOps:
+- **Data Drift (Covariate Shift):** Occurs when the distribution of the input features $P(X)$ changes over time, while the underlying mapping to labels $P(Y|X)$ remains constant. For example, your e-commerce app suddenly receives a surge of younger users whose shopping habits differ. We detect this by running Kolmogorov-Smirnov (KS) tests or computing the Population Stability Index (PSI) between baseline and production feature distributions.
+- **Concept Drift:** Occurs when the fundamental statistical relationship between inputs and outputs $P(Y|X)$ changes. For example, macroeconomic inflation alters consumer spending thresholds, or credit card fraudsters adopt novel evasion techniques. We detect concept drift by tracking rolling validation metrics (F1-score, latency, calibration error) and trigger automated continuous retraining pipelines."

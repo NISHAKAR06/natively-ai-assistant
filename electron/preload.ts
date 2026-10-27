@@ -1293,6 +1293,7 @@ interface ElectronAPI {
   modesDeleteReferenceFile: (id: string) => Promise<{ success: boolean; error?: string }>;
   modesOpenReferenceFile: (fileId: string) => Promise<{ success: boolean; path?: string; error?: string }>;
   modesGetReferenceFileById: (fileId: string) => Promise<{ success: boolean; file?: any; error?: string }>;
+  modesSaveCustomReferenceFile: (params: { modeId: string; fileName: string; content: string }) => Promise<{ success: boolean; file?: any; error?: string }>;
   knowledgeBooksGetBooks: () => Promise<{ success: boolean; books: Array<{ id: string; title: string; role: string; fileName: string; path: string; content: string }>; error?: string }>;
   knowledgeBooksOpenBook: (bookId: string) => Promise<{ success: boolean; path?: string; error?: string }>;
   modesGetReferenceFileStatus: (
@@ -3289,6 +3290,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   modesDeleteReferenceFile: (id: string) => ipcRenderer.invoke('modes:delete-reference-file', id),
   modesOpenReferenceFile: (fileId: string) => ipcRenderer.invoke('modes:open-reference-file', fileId),
   modesGetReferenceFileById: (fileId: string) => ipcRenderer.invoke('modes:get-reference-file-by-id', fileId),
+  modesSaveCustomReferenceFile: (params: { modeId: string; fileName: string; content: string }) =>
+    ipcRenderer.invoke('modes:save-custom-reference-file', params),
   knowledgeBooksGetBooks: () => ipcRenderer.invoke('knowledge-books:get-books'),
   knowledgeBooksOpenBook: (bookId: string) => ipcRenderer.invoke('knowledge-books:open-book', bookId),
   modesGetReferenceFileStatus: (modeId: string) =>

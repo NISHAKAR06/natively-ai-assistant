@@ -1237,13 +1237,18 @@ The user triggered this action with a coding problem on screen and NO new questi
                 (!candidateProfile && resolvedQuestionText.length > 5)
             );
 
+            const activeModeId = (requestSnapshot?.modeUniqueId || '').toLowerCase();
+            const isSde = activeModeId.includes('sde') || activeSkill?.id?.toLowerCase().includes('sde');
+            const isAiml = activeModeId.includes('aiml') || activeSkill?.id?.toLowerCase().includes('aiml');
+            const interviewRole = isAiml ? 'aiml' : isSde ? 'sde' : undefined;
+
             let webResearchBlock = '';
             if (isTechnicalOrConceptual && resolvedQuestionText) {
                 try {
                     const { TavilySearchService } = require('../services/TavilySearchService');
                     const tavily = TavilySearchService.getInstance();
                     if (tavily.hasApiKey()) {
-                        const tavilyRes = await tavily.searchForInterview(resolvedQuestionText, 2500);
+                        const tavilyRes = await tavily.searchForInterview(resolvedQuestionText, 2500, interviewRole);
                         if (tavilyRes?.formattedResearch) {
                             webResearchBlock = tavilyRes.formattedResearch;
                         }
@@ -1271,6 +1276,17 @@ When explaining a technical concept, language, framework, database, AI/ML topic,
    - "Real-world example:": Mentioning real production tools, databases, or systems (e.g. ChatGPT, Gemini, PostgreSQL, Docker, Redis, Kubernetes) and how they apply this.
    - Inline citation links [[1](url)] where applicable.
 3. Key Concepts: Include a section titled "Key Concepts" listing 2-4 core terms with concise 1-sentence explanations and citations.`;
+            }
+
+            if (interviewRole) {
+                _wtaSystemPrompt = `${_wtaSystemPrompt}\n\n## OFFICIAL DOCUMENTATION GROUNDING MANDATE (${interviewRole === 'aiml' ? 'AI/ML' : 'SDE'} ROLE):
+The candidate is actively interviewing for an ${interviewRole === 'aiml' ? 'Artificial Intelligence / Machine Learning Engineer' : 'Software Development Engineer (SDE)'} position.
+When the interviewer asks about a technical concept, pattern, tool, or algorithm:
+1. GROUND STRICTLY IN OFFICIAL PAGES: Base all technical explanations, definitions, and mechanics exclusively on verified official documentation (GeeksforGeeks, W3Schools, Python/PyTorch/MDN official docs) provided in the research block and knowledge handbooks. Do NOT hallucinate definitions.
+2. CONVERSATIONAL SPOKEN ENGLISH: Formulate the response in natural, humanized English that sounds authentic and smooth when the candidate reads or speaks it aloud to the interviewer. Avoid overly dense robotic jargon.
+3. DETAILED PRACTICAL EXAMPLE: Always include an intuitive real-world scenario illustrating how the concept operates in production.
+4. CODE WHEN APPLICABLE: If code, syntax, or SQL is relevant to the question, provide clean, idiomatic, runnable code snippets.
+5. CITATIONS: Cite the official source URL(s) inline with markdown links: [[1](url), [2](url)].`;
             }
 
             // Prefer the outcome-bearing API so a truncated answer can be kept

@@ -21,8 +21,11 @@ import {
   SlidersHorizontal,
   X,
   BookOpen,
+  Brain,
+  Plus,
 } from 'lucide-react';
 import { FileViewerModal } from './ui/FileViewerModal';
+import { AddCustomFileModal } from './ui/AddCustomFileModal';
 import {
   mergeRollingTranscriptFinal,
   mergeRollingTranscriptPartial,
@@ -1476,6 +1479,33 @@ const NativelyInterface: React.FC<NativelyInterfaceProps> = ({
       }
     } catch (e) {
       console.error('Error opening handbook viewer:', e);
+    }
+  };
+
+  const [showRoleSelector, setShowRoleSelector] = useState(false);
+  const [isAddCustomFileOpen, setIsAddCustomFileOpen] = useState(false);
+  const [activeRoleTrack, setActiveRoleTrack] = useState<string | null>(null);
+
+  useEffect(() => {
+    window.electronAPI?.modesGetActive?.().then((mode: any) => {
+      setActiveRoleTrack(mode?.templateType || mode?.id || null);
+    }).catch(() => {});
+
+    const unsub = window.electronAPI?.onModeChanged?.((data: any) => {
+      setActiveRoleTrack(data?.id || null);
+    });
+    return () => { unsub?.(); };
+  }, []);
+
+  const handleSelectRole = async (roleId: string | null) => {
+    setShowRoleSelector(false);
+    const api = (window as any).electronAPI;
+    if (!api?.modesSetActive) return;
+    try {
+      await api.modesSetActive(roleId);
+      setActiveRoleTrack(roleId);
+    } catch (e) {
+      console.error('Error changing active role:', e);
     }
   };
   const [conversationContext, setConversationContext] = useState<string>('');
@@ -12582,6 +12612,114 @@ Provide only the answer, nothing else.`;
                       <ChevronDown size={12} className="shrink-0 transition-transform" />
                     </button>
 
+                    {/* Role Selector Button & Menu */}
+                    <div className="relative">
+                      <button
+                        onClick={() => setShowRoleSelector((prev) => !prev)}
+                        title={t('Current Interview Role: Click to switch between SDE, AI/ML, and General')}
+                        className={`
+                          flex items-center gap-1.5 px-2 h-7 rounded-[9px] border text-xs font-medium
+                          interaction-base interaction-press transition-all shrink-0
+                          ${
+                            activeRoleTrack?.includes('sde')
+                              ? 'border-cyan-500/40 bg-cyan-500/15 text-cyan-300'
+                              : activeRoleTrack?.includes('aiml')
+                              ? 'border-purple-500/40 bg-purple-500/15 text-purple-300'
+                              : 'border-border-muted bg-bg-item-surface text-text-secondary hover:text-text-primary'
+                          }
+                        `}
+                      >
+                        {activeRoleTrack?.includes('sde') ? (
+                          <>
+                            <Code className="w-3.5 h-3.5 text-cyan-400" />
+                            <span>SDE Role</span>
+                          </>
+                        ) : activeRoleTrack?.includes('aiml') ? (
+                          <>
+                            <Brain className="w-3.5 h-3.5 text-purple-400" />
+                            <span>AI/ML Role</span>
+                          </>
+                        ) : (
+                          <>
+                            <Globe className="w-3.5 h-3.5 text-text-tertiary" />
+                            <span>Role: General</span>
+                          </>
+                        )}
+                        <ChevronDown className="w-3 h-3 opacity-60 ml-0.5" />
+                      </button>
+
+                      {showRoleSelector && (
+                        <div
+                          className="absolute bottom-full mb-1.5 left-0 z-[100] w-64 rounded-xl border border-border-muted bg-bg-elevated p-1.5 shadow-2xl backdrop-blur-md text-text-primary"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <div className="px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-text-tertiary">
+                            Select Interview Role
+                          </div>
+                          <button
+                            onClick={() => handleSelectRole('sde-interview')}
+                            className={`flex items-center justify-between w-full rounded-lg px-2.5 py-1.5 text-xs text-left transition-colors ${
+                              activeRoleTrack?.includes('sde') ? 'bg-cyan-500/15 text-cyan-300 font-medium' : 'hover:bg-bg-item-hover text-text-primary'
+                            }`}
+                          >
+                            <div className="flex items-center gap-2">
+                              <Code className="w-3.5 h-3.5 text-cyan-400" />
+                              <div>
+                                <div className="font-medium">SDE Role</div>
+                                <div className="text-[10px] text-text-tertiary">DSA, System Design, GFG Q&A</div>
+                              </div>
+                            </div>
+                            {activeRoleTrack?.includes('sde') && <Check className="w-3.5 h-3.5 text-cyan-400" />}
+                          </button>
+
+                          <button
+                            onClick={() => handleSelectRole('aiml-interview')}
+                            className={`flex items-center justify-between w-full rounded-lg px-2.5 py-1.5 text-xs text-left transition-colors mt-0.5 ${
+                              activeRoleTrack?.includes('aiml') ? 'bg-purple-500/15 text-purple-300 font-medium' : 'hover:bg-bg-item-hover text-text-primary'
+                            }`}
+                          >
+                            <div className="flex items-center gap-2">
+                              <Brain className="w-3.5 h-3.5 text-purple-400" />
+                              <div>
+                                <div className="font-medium">AI / ML Role</div>
+                                <div className="text-[10px] text-text-tertiary">PyTorch, LLMs, GFG Q&A</div>
+                              </div>
+                            </div>
+                            {activeRoleTrack?.includes('aiml') && <Check className="w-3.5 h-3.5 text-purple-400" />}
+                          </button>
+
+                          <button
+                            onClick={() => handleSelectRole(null)}
+                            className={`flex items-center justify-between w-full rounded-lg px-2.5 py-1.5 text-xs text-left transition-colors mt-0.5 ${
+                              !activeRoleTrack || activeRoleTrack === 'general' ? 'bg-accent-primary/15 text-accent-primary font-medium' : 'hover:bg-bg-item-hover text-text-primary'
+                            }`}
+                          >
+                            <div className="flex items-center gap-2">
+                              <Globe className="w-3.5 h-3.5 text-text-tertiary" />
+                              <div>
+                                <div className="font-medium">General Mode</div>
+                                <div className="text-[10px] text-text-tertiary">Standard interview & meetings</div>
+                              </div>
+                            </div>
+                            {(!activeRoleTrack || activeRoleTrack === 'general') && <Check className="w-3.5 h-3.5 text-accent-primary" />}
+                          </button>
+
+                          <div className="my-1 border-t border-border-muted/50" />
+
+                          <button
+                            onClick={() => {
+                              setShowRoleSelector(false);
+                              setIsAddCustomFileOpen(true);
+                            }}
+                            className="flex items-center gap-2 w-full rounded-lg px-2.5 py-1.5 text-xs text-accent-primary hover:bg-accent-primary/10 transition-colors"
+                          >
+                            <Plus className="w-3.5 h-3.5" />
+                            <span>Add Custom File or MD Note...</span>
+                          </button>
+                        </div>
+                      )}
+                    </div>
+
                     <div className="relative">
                       <button
                         data-settings-toggle="true"
@@ -12733,6 +12871,14 @@ Provide only the answer, nothing else.`;
               : null
           );
         }}
+      />
+    )}
+
+    {isAddCustomFileOpen && (
+      <AddCustomFileModal
+        isOpen={isAddCustomFileOpen}
+        onClose={() => setIsAddCustomFileOpen(false)}
+        defaultModeId={activeRoleTrack || 'sde-interview'}
       />
     )}
     </>

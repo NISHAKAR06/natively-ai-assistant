@@ -3,6 +3,7 @@ import { X, Plus, Trash2, Upload, FileText, Check, Sparkles, Save, Loader2, Code
 import { ModesSettings as PremiumModesSettings } from '../../premium';
 import { AipSelect } from './AIProvidersSettings';
 import { FileViewerModal } from '../ui/FileViewerModal';
+import { AddCustomFileModal } from '../ui/AddCustomFileModal';
 
 const TEMPLATE_OPTIONS = [
   { value: 'general', label: 'General' },
@@ -55,6 +56,7 @@ const BuiltinModesSettings: React.FC<ModesSettingsProps> = ({ onClose }) => {
   const [newModeName, setNewModeName] = useState('');
   const [newModeTemplate, setNewModeTemplate] = useState('technical-interview');
   const [showCreateForm, setShowCreateForm] = useState(false);
+  const [isAddCustomModalOpen, setIsAddCustomModalOpen] = useState(false);
   const [viewingFile, setViewingFile] = useState<{
     isOpen: boolean;
     title: string;
@@ -565,22 +567,32 @@ const BuiltinModesSettings: React.FC<ModesSettingsProps> = ({ onClose }) => {
                       : 'Upload PDFs, DOCX resumes, job descriptions, lecture notes, or code files for instant local retrieval.'}
                   </p>
                 </div>
-                <button
-                  onClick={() => void handleUploadFile()}
-                  disabled={isUploading}
-                  className="flex items-center gap-1.5 rounded-lg bg-accent-primary/15 px-3 py-1.5 text-xs font-medium text-accent-primary hover:bg-accent-primary/25"
-                >
-                  {isUploading ? (
-                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                  ) : (
-                    <Upload className="h-3.5 w-3.5" />
-                  )}
-                  {selectedMode.templateType === 'sde-interview'
-                    ? 'Upload SDE File'
-                    : selectedMode.templateType === 'aiml-interview'
-                    ? 'Upload AI/ML File'
-                    : 'Upload File'}
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setIsAddCustomModalOpen(true)}
+                    className="flex items-center gap-1.5 rounded-lg border border-accent-primary/40 bg-accent-primary/10 px-3 py-1.5 text-xs font-medium text-accent-primary hover:bg-accent-primary/20 transition-colors"
+                    title="Write or customize a Markdown note directly"
+                  >
+                    <Plus className="h-3.5 w-3.5" />
+                    <span>Custom MD Note</span>
+                  </button>
+                  <button
+                    onClick={() => void handleUploadFile()}
+                    disabled={isUploading}
+                    className="flex items-center gap-1.5 rounded-lg bg-accent-primary/15 px-3 py-1.5 text-xs font-medium text-accent-primary hover:bg-accent-primary/25"
+                  >
+                    {isUploading ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <Upload className="h-3.5 w-3.5" />
+                    )}
+                    {selectedMode.templateType === 'sde-interview'
+                      ? 'Upload SDE File'
+                      : selectedMode.templateType === 'aiml-interview'
+                      ? 'Upload AI/ML File'
+                      : 'Upload File'}
+                  </button>
+                </div>
               </div>
 
               {refFiles.length === 0 ? (
@@ -652,6 +664,24 @@ const BuiltinModesSettings: React.FC<ModesSettingsProps> = ({ onClose }) => {
           content={viewingFile.content}
           fileId={viewingFile.fileId}
           bookId={viewingFile.bookId}
+        />
+      )}
+
+      {isAddCustomModalOpen && (
+        <AddCustomFileModal
+          isOpen={isAddCustomModalOpen}
+          onClose={() => setIsAddCustomModalOpen(false)}
+          defaultModeId={selectedMode?.id || 'sde-interview'}
+          onFileSaved={() => {
+            if (selectedMode?.id) {
+              const api = (window as any).electronAPI;
+              if (api?.modesGetReferenceFiles) {
+                void api.modesGetReferenceFiles(selectedMode.id).then((files: any) => {
+                  setRefFiles(Array.isArray(files) ? files : []);
+                });
+              }
+            }
+          }}
         />
       )}
     </div>

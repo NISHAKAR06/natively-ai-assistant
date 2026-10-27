@@ -18736,6 +18736,23 @@ export function initializeIpcHandlers(appState: AppState): void {
     }
   });
 
+  safeHandle('modes:save-custom-reference-file', async (_, params: { modeId: string; fileName: string; content: string }) => {
+    try {
+      const { ModesManager } = require('./services/ModesManager');
+      const cleanName = (params?.fileName || 'custom_notes.md').trim();
+      const finalName = cleanName.endsWith('.md') || cleanName.endsWith('.txt') ? cleanName : `${cleanName}.md`;
+      const file = ModesManager.getInstance().addReferenceFile({
+        modeId: params?.modeId || 'sde-interview',
+        fileName: finalName,
+        content: params?.content || '',
+      });
+      return { success: true, file };
+    } catch (e: any) {
+      console.error('[IPC] modes:save-custom-reference-file error:', e);
+      return { success: false, error: e?.message || String(e) };
+    }
+  });
+
   safeHandle('knowledge-books:get-books', async () => {
     try {
       const sdeCandidates = [

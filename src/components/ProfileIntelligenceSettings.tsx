@@ -7,6 +7,7 @@ import {
     Edit3, Save, Github, Code, ExternalLink, Plus, Sparkles, Eye, BookOpen,
 } from 'lucide-react';
 import { FileViewerModal } from './ui/FileViewerModal';
+import { AddCustomFileModal } from './ui/AddCustomFileModal';
 import { ThinkingOrb } from 'thinking-orbs';
 import { useToggleInit } from './settings/useToggleInit';
 import { RoleInsightPanel } from '../premium';
@@ -2084,6 +2085,7 @@ export function ProfileIntelligenceSettings({
     const [isUploadingRoleFile, setIsUploadingRoleFile] = useState(false);
     const [roleTrackStatus, setRoleTrackStatus] = useState<string | null>(null);
     const [activeModeId, setActiveModeId] = useState<string | null>(null);
+    const [isAddCustomOpen, setIsAddCustomOpen] = useState(false);
     const [viewingFile, setViewingFile] = useState<{
         isOpen: boolean;
         title: string;
@@ -3600,6 +3602,29 @@ export function ProfileIntelligenceSettings({
                             <button
                                 type="button"
                                 className="pi-press"
+                                onClick={() => setIsAddCustomOpen(true)}
+                                style={{
+                                    fontSize: 11,
+                                    fontWeight: 600,
+                                    padding: '5px 11px',
+                                    borderRadius: 'var(--pi-r-pill)',
+                                    border: '1px solid var(--pi-border)',
+                                    background: 'var(--pi-btn-bg)',
+                                    color: 'var(--pi-primary)',
+                                    cursor: 'pointer',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: 5,
+                                }}
+                                title="Write or customize a Markdown note directly"
+                            >
+                                <Plus size={11} />
+                                Custom MD Note
+                            </button>
+
+                            <button
+                                type="button"
+                                className="pi-press"
                                 disabled={isUploadingRoleFile}
                                 onClick={handleUploadRoleFile}
                                 style={{
@@ -4942,6 +4967,17 @@ export function ProfileIntelligenceSettings({
                     content={viewingFile.content}
                     fileId={viewingFile.fileId}
                     bookId={viewingFile.bookId}
+                />
+            )}
+
+            {isAddCustomOpen && (
+                <AddCustomFileModal
+                    isOpen={isAddCustomOpen}
+                    onClose={() => setIsAddCustomOpen(false)}
+                    defaultModeId={roleTrack}
+                    onFileSaved={() => {
+                        void loadRoleTrackFiles(roleTrack);
+                    }}
                 />
             )}
         </div>
