@@ -130,6 +130,15 @@ export class ConversationMemoryService {
     try {
       const arr = this.bySession.get(sessionId) || [];
       if (arr.length === 0) return null;
+      const fu = (followUp || '').trim();
+      // Standalone definition / concept questions are NOT follow-ups to prior turns
+      // (prevents "what is python" from matching "what is sql" or prior resume text)
+      const isStandaloneQuery = /^(what is|what are|explain|describe|difference between|compare|how does|how do|define)\b/i.test(fu) &&
+        !/\b(that|this|it|those|these|previous|earlier|last|above|mentioned|again|further|expand|elaborate)\b/i.test(fu);
+      if (isStandaloneQuery) {
+        return null;
+      }
+
       const ents = new Set(entitiesOf(followUp).map((e) => e.toLowerCase()));
       const matched: string[] = followUp.toLowerCase().match(/[a-z0-9']+/g) ?? [];
       const terms = new Set(matched.filter((t) => t.length > 2 && !STOP.has(t)));
@@ -152,7 +161,6 @@ export class ConversationMemoryService {
       // carry no topic — previously these returned null and dead-ended (test-engineer
       // Phase 11). Kept self-safe with a short-length guard so a stray long string can't
       // trip it even if a caller forgets the isBareFollowUp gate.
-      const fu = (followUp || '').trim();
       const RECENCY_FALLBACK_RE = /\b(that|it|this|those|and|also|what about|continue|carry on|keep going|go on|previous|earlier|last|why|how|so|then|more|expand|elaborate|deeper|detail|tell me more|go deeper|explain)\b/i;
       if (!best && fu.split(/\s+/).length <= 6 && RECENCY_FALLBACK_RE.test(fu)) {
         return arr[arr.length - 1];

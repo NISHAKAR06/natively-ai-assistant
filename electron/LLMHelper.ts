@@ -8715,7 +8715,8 @@ let isMultimodal = !!(imagePaths?.length);
     };
 
     // For OpenAI/Claude: separate system prompt + user message (proper API pattern)
-    const isProfileContext = context && (context.includes('CANDIDATE') || context.includes('RESUME') || context.includes('PROFILE'));
+    const isAskingAboutCandidate = /(tell me about (your|my)|who (are you|am i)|your experience|my experience|your background|my background|your projects?|my projects?|walk me through your|what are your skills)/i.test(message);
+    const isProfileContext = Boolean(context && (context.includes('CANDIDATE') || context.includes('RESUME') || context.includes('PROFILE')) && isAskingAboutCandidate);
     const userContent = context
       ? (isProfileContext
           ? `VERIFIED CANDIDATE BACKGROUND & FACTS:\n${context}\n\nQUESTION TO ANSWER AS THE CANDIDATE:\n${message}\n\nPlease generate a natural, confident first-person interview answer synthesizing the background above:`
@@ -8853,7 +8854,6 @@ let isMultimodal = !!(imagePaths?.length);
     if (providers.length === 0) {
       if (this.ollamaModel) {
         console.log('[LLMHelper] No cloud provider available in streamChatWithGemini, falling back to Ollama:', this.ollamaModel);
-        this.useOllama = true;
         const ollamaSystemPrompt = systemPromptOverride || this.resolveLocalSystemPrompt(skipSystemPrompt ? TINY_SYSTEM_PROMPT : (effectiveSystemPrompt ?? HARD_SYSTEM_PROMPT));
         yield* this.streamWithOllama(userContent, undefined, ollamaSystemPrompt, imagePaths, abortSignal);
         return;
@@ -13243,8 +13243,8 @@ let isMultimodal = !!(imagePaths?.length);
     // Honor the selected Gemini model as the starting rung; fall forward only.
     // Non-Gemini selections (fell through to Gemini) and flash-lite start at 0.
     const startIndex =
-      this.currentModelId === GEMINI_PRO_MODEL ? 2 :
-      this.currentModelId === GEMINI_FLASH_MODEL ? 1 :
+      this.currentModelId === GEMINI_PRO_MODEL || this.geminiModel === GEMINI_PRO_MODEL || /pro/i.test(this.currentModelId || '') ? 2 :
+      this.currentModelId === GEMINI_FLASH_MODEL || this.geminiModel === GEMINI_FLASH_MODEL || /flash/i.test(this.currentModelId || '') ? 1 :
       0;
     const providers = ladder.slice(startIndex);
 

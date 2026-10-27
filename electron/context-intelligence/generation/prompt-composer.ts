@@ -1569,6 +1569,9 @@ export function composePrompt(input: ComposeInput): ComposedPrompt {
     // After the length default on purpose: the note says what that limit does
     // and does not cover on a diagram turn.
     diagramTurn ? push('diagram_turn', diagramTurn) : '',
+    input.conversationSummary
+      ? push('current_question_focus', `# Target Question\nAnswer strictly this question: "${d.resolvedQuestion}". Do not answer or repeat past questions from the conversation history above. Respond conversationally.`)
+      : '',
     // LAST in the whole prompt — the strongest position — so nothing the app
     // says can follow, and so contradict, what the user asked for.
     userBlock ? push('user_instructions', userBlock) : '',

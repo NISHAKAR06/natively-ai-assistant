@@ -19,7 +19,7 @@ const TECHNICAL_SUBJECT_PATTERNS = [
   /\b(deadlock|mutex|semaphore|thread|process|concurrency|race condition)\b/i,
   /\b(tcp|udp|http|https|dns|ip|osi|latency|throughput|socket)\b/i,
   /\b(database|index|normalization|acid|transaction|sharding|replication)\b/i,
-  /\b(sql|nosql|no[- ]?sql|relational|document (db|database|store)|key[- ]?value|columnar|mongodb|postgres\w*|mysql|sqlite)\b/i,
+  /\b(sql|nosql|no[- ]?sql|relational|document (db|database|store)|key[- ]?value|columnar|mongodb|postgres\w*|mysql|sqlite|dbms|rdbms|data warehouse|data warehousing|vector database|vector db|duckdb)\b/i,
   /\b(eventual consistency|strong consistency|consistency model|cap theorem|consensus|quorum|paxos|raft|two[- ]?phase commit)\b/i,
   /\b(amortized|complexity|big[- ]?o|asymptotic|np[- ]?complete)\b/i,
   /\b(closure|hoisting|prototype|garbage collection|event loop|promise|async)\b/i,
@@ -79,6 +79,11 @@ const SOFTWARE_ENGINEERING_CONCEPT_PATTERNS = [
   /\b(design patterns?|singletons?|factory patterns?|observer patterns?|solid principles?)\b/i,
   /\b(memory leaks?|load balanc\w*)\b/i,
   /\b(unit test\w*|\btdd\b|test[- ]?driven development|monorepos?)\b/i,
+];
+
+export const PROGRAMMING_LANGUAGE_AND_TOOL_PATTERNS = [
+  /\b(python|java|c\+\+|rust|golang|ruby|php|c#|csharp|swift|kotlin|scala|html|css|bash|shell|git|github|linux|unix|kernel)\b/i,
+  /\b(oop|object[- ]oriented|functional programming|event[- ]driven)\b/i,
 ];
 
 // A PEOPLE / leadership / conflict OBJECT after a lead/manage/handle verb marks a behavioral

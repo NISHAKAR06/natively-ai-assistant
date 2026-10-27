@@ -1018,6 +1018,10 @@ ${text.slice(0, 8000)}`;
   }
 
   public async processQuestion(question: string): Promise<{ relevantFacts: string; sources: string[] } | null> {
+    const isPersonalQuery = /(tell (me )?about (my|your) (experience|background|projects?|work|career)|tell me about yourself|who (am i|are you)|walk me through (my|your) (resume|background|cv)|what is (my|your) (experience|background)|what are (my|your) (skills|strengths|weaknesses)|what projects have (i|you) worked on|why should we hire you|my projects?|my resume|my experience|my background|introduce yourself)/i.test(question);
+    if (!isPersonalQuery) {
+      return null;
+    }
     const facts = this.getProfileFacts();
     if (!facts) return null;
     return {

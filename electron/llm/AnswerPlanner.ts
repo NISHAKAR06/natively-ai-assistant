@@ -37,6 +37,7 @@ import {
   SALES_PATTERNS,
   SKILLS_PATTERNS,
   SKILL_EXPERIENCE_PATTERNS,
+  PROGRAMMING_LANGUAGE_AND_TOOL_PATTERNS,
   SKILL_RATING_PATTERNS,
   SOFTWARE_ENGINEERING_CONCEPT_PATTERNS,
   SOURCE_CODE_EVIDENCE_PATTERNS,
@@ -608,11 +609,13 @@ const TYPO_TOLERANT_TECHNICAL_TERMS = [
   'concurrency', 'asynchronous', 'polymorphism', 'inheritance', 'websocket',
   'idempotent', 'middleware', 'endpoint', 'authentication', 'authorization',
   'serverless', 'container', 'framework', 'compiler', 'interpreter',
+  'python', 'dbms', 'rdbms', 'sqlite', 'linux', 'golang',
 ];
 const isLikelyTechnicalConcept = (text: string): boolean =>
   includesAny(text, TECHNICAL_SUBJECT_PATTERNS)
   || includesAny(text, DEVOPS_CICD_PATTERNS)
   || includesAny(text, SOFTWARE_ENGINEERING_CONCEPT_PATTERNS)
+  || includesAny(text, PROGRAMMING_LANGUAGE_AND_TOOL_PATTERNS)
   || TYPO_TOLERANT_TECHNICAL_TERMS.some((term) => includesPlannerTerm(text, term));
 
 

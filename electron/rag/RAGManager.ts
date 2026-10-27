@@ -415,7 +415,7 @@ export class RAGManager {
         }
 
         // 2. Candidate Experience / "Tell me about yourself" queries: Synthesize fresh narrative
-        const isCandidateQuery = /(tell (me )?about (my|your) experience|tell me about yourself|who am i|walk me through (my|your) (resume|background)|what is my experience|what are my skills|what projects have i worked on|what is my background)/i.test(normalized);
+        const isCandidateQuery = /(tell (me )?about (my|your) (experience|background|projects?|work|career)|tell me about yourself|who (am i|are you)|walk me through (my|your) (resume|background|cv)|what is (my|your) (experience|background)|what are (my|your) (skills|strengths|weaknesses)|what projects have (i|you) worked on|why should we hire you|my projects?|my resume|my experience|my background|introduce yourself)/i.test(normalized);
         if (isCandidateQuery) {
             let facts = '';
             try {
@@ -426,11 +426,10 @@ export class RAGManager {
                 const candidateSystemPrompt = `You are an expert AI interview copilot speaking directly as the candidate in first person ("I", "my", "we").
 The interviewer just asked: "${query}".
 Generate a cohesive, highly articulate, confident first-person interview answer:
-1. Introduce yourself clearly (Name, AI/ML engineering background, focus on building production ML and GenAI systems).
-2. Walk through your core work experience at Infosys Springboard and Intel Unnati: detail the readmission-risk model, algorithms (XGBoost, Isolation Forest, Random Forest), metrics, and real-time backend systems.
-3. Highlight key projects like Threshold (AI Governance with LangGraph) and MediQuery AI.
-4. Speak in natural, polished conversational narrative paragraphs as an impressive engineering candidate in an interview.
-5. NEVER just regurgitate or copy raw bullet points. Do NOT output disclaimers or timeline dates like "As of Thursday...".`;
+1. Introduce yourself clearly and speak directly to your background, expertise, and technical focus based on the profile facts below.
+2. Walk through your core work experience, key projects, metrics, and engineering achievements described in the verified facts.
+3. Speak in natural, polished conversational narrative paragraphs as an impressive engineering candidate in an interview.
+4. NEVER just regurgitate or copy raw bullet points or headers like "Key Skills:". Convert all facts into natural spoken sentences.`;
 
                 const streamOutcome: { incomplete?: boolean } = {};
                 const stream = this.llmHelper.streamChatWithGemini(
@@ -462,14 +461,16 @@ Generate a cohesive, highly articulate, confident first-person interview answer:
                 return { chunks: [], formattedContext: '', totalTokens: 0, meetingIds: [], intent: 'open_question' as const };
             }),
             (async () => {
+                // Profile facts should ONLY be retrieved for questions specifically asking about the candidate
+                if (!isCandidateQuery) return null;
                 try {
                     const orch = this.llmHelper?.getKnowledgeOrchestrator?.();
+                    if (orch?.processQuestion) {
+                        return await orch.processQuestion(query);
+                    }
                     if (orch?.getProfileFacts) {
                         const facts = orch.getProfileFacts();
                         if (facts) return { relevantFacts: facts };
-                    }
-                    if (orch?.processQuestion) {
-                        return await orch.processQuestion(query);
                     }
                 } catch (e: any) {
                     console.warn('[RAGManager] Could not retrieve candidate profile facts:', e?.message || e);

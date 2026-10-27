@@ -304,10 +304,14 @@ const ModelSelectorWindow = () => {
         const unsubCredentials = window.electronAPI?.onCredentialsChanged?.(() => {
             loadModels();
         });
+        const unsubShown = window.electronAPI?.onModelSelectorShown?.(() => {
+            loadModels();
+        });
         return () => {
             cancelled = true;
             unsubscribe?.();
             unsubCredentials?.();
+            unsubShown?.();
         };
     }, []);
 

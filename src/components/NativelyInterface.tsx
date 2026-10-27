@@ -12515,22 +12515,13 @@ Provide only the answer, nothing else.`;
                           // user sees for the whole trial. 'Natively API' is what the
                           // model picker and every settings row already call it.
                           if (m === 'natively') return 'Natively API';
-                          // For everything else, prefer the authoritative
-                          // displayName from `getCurrentLlmConfig` (handles
-                          // custom-provider UUIDs and any future model aliases
-                          // without each consumer needing its own resolver).
-                          // Falls back to the raw identifier if the IPC has
-                          // not yet resolved.
-                          if (currentModelDisplayName && currentModelDisplayName !== m) {
-                            return currentModelDisplayName;
-                          }
-                          if (m === 'gemini-3.8-flash') return 'Gemini 3.8 Flash';
+                          if (m === 'gemini-3.8-flash' || m === 'gemini') return 'Gemini 3.8 Flash';
                           // Legacy ids, still valid and still selectable from
                           // persisted state — name them instead of showing the slug.
                           if (m === 'gemini-3.7-flash') return 'Gemini 3.7 Flash';
                           if (m === 'gemini-3.6-flash') return 'Gemini 3.6 Flash';
                           if (m === 'gemini-3.1-flash-lite') return 'Gemini 3.1 Flash Lite';
-                          if (m === 'gemini-3.1-pro-preview') return 'Gemini 3.1 Pro';
+                          if (m === 'gemini-3.1-pro-preview' || m === 'gemini-pro') return 'Gemini 3.1 Pro';
                           if (m === 'qwen/qwen3.8-27b') return 'Groq Qwen 3.8';
                           if (m === 'qwen/qwen3.6-27b') return 'Groq Qwen 3.6';
                           if (m === 'openai/gpt-oss-120b') return 'Groq GPT-OSS 120B';
@@ -12544,6 +12535,9 @@ Provide only the answer, nothing else.`;
                           if (m.startsWith('openrouter/')) return gatewayModelLabel(m);
                           if (m.startsWith('nvidia_nim/')) return gatewayModelLabel(m);
                           if (m.startsWith('antigravity:')) return m.replace('antigravity:', '');
+                          if (currentModelDisplayName && currentModelDisplayName !== m) {
+                            return currentModelDisplayName;
+                          }
                           return prettifyModelId(m);
                         })()}
                       </ModelSelectorLabel>
