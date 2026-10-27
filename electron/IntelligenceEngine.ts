@@ -38,6 +38,7 @@ import { HARD_SYSTEM_PROMPT } from './llm/prompts';
 import type { ActiveModeInfo } from './llm/modeProfiles';
 import type { WhatToAnswerRequestSnapshot } from './llm/whatToAnswerRequestSnapshot';
 import { resolveCanonicalTurn } from './llm/resolveCanonicalTurn';
+import { QUESTION_MARK, INTERROGATIVE_LEAD, IMPERATIVE_ASK } from './llm/questionShapes';
 import { speechWindowForPrompt, SPEECH_WINDOW_SECONDS } from './llm/conversationHistoryPolicy';
 import { performanceHooks, applyAdaptiveTtft, secondaryStreamObserver, slowWorkloadAdvice } from './llm/performance/wiring';
 import { estimateTokens } from './llm/modelCapabilities';
@@ -2306,12 +2307,13 @@ export class IntelligenceEngine extends EventEmitter {
                 const lastIdx = (role: 'user' | 'interviewer') => { for (let i = transcriptTurns.length - 1; i >= 0; i--) if (transcriptTurns[i].role === role && String(transcriptTurns[i].text || '').trim()) return i; return -1; };
                 const ui = lastIdx('user'), ii = lastIdx('interviewer');
                 const userText = ui >= 0 ? String(transcriptTurns[ui].text).trim() : '';
-                const userAskedLast = ui > ii && userText.length >= 12
-                    // Auxiliary-first questions too (2026-09-11, team-meet
-                    // simulation): "did anyone mention the elasticsearch window"
-                    // matched nothing here, so the extractor kept the other
-                    // party's "thanks, bye" and retrieval ran on THAT.
-                    && /\b(?:what|which|how (?:many|much|long|often)|who|whom|when|where|remind (?:me|us)|do we (?:know|have)|does (?:it|the \w+) say|what'?s|(?:did|does|do|has|have|had|is|are|was|were|will|can|could|should|would)\s+(?:anyone|anybody|someone|somebody|we|they|he|she|it|you|i|the\s+\w+|that|this|there))\b/i.test(userText)
+                const userAskedLast = ui > ii && userText.length >= 8
+                    && (
+                        QUESTION_MARK.test(userText) ||
+                        INTERROGATIVE_LEAD.test(userText) ||
+                        IMPERATIVE_ASK.test(userText) ||
+                        /\b(?:what|which|how (?:many|much|long|often)|who|whom|when|where|remind (?:me|us)|do we (?:know|have)|does (?:it|the \w+) say|what'?s|(?:did|does|do|has|have|had|is|are|was|were|will|can|could|should|would)\s+(?:anyone|anybody|someone|somebody|we|they|he|she|it|you|i|the\s+\w+|that|this|there))\b/i.test(userText)
+                    )
                     && !/\b(?:what do you mean|could you (?:repeat|clarify|rephrase)|say (?:that )?again|sorry,? (?:what|i (?:didn'?t|did not) (?:catch|get)))\b/i.test(userText);
                 if (userAskedLast && extractedQuestion.latestQuestion !== userText) {
                     extractedQuestion.latestQuestion = userText;

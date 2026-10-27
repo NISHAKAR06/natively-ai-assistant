@@ -158,3 +158,47 @@ test('Interface exposes direct File Open button, menu, and native OS desktop lau
   assert.ok(launcherContent.includes('handlePickAndOpenFile'), 'Launcher should support handlePickAndOpenFile');
   assert.ok(launcherContent.includes('FolderOpen'), 'Launcher should render FolderOpen icon');
 });
+
+test('Candidate Portfolio Dossier, 8th Node, Class Imbalance, and Anti-Pollution Grounding', () => {
+  const candidatePath = path.join(projectRoot, 'knowledge-books', 'Candidate_Portfolio_and_Projects.md');
+  const resCandidatePath = path.join(projectRoot, 'resources', 'knowledge-books', 'Candidate_Portfolio_and_Projects.md');
+
+  assert.ok(fs.existsSync(candidatePath), 'Candidate portfolio should exist in knowledge-books/');
+  assert.ok(fs.existsSync(resCandidatePath), 'Candidate portfolio should exist in resources/knowledge-books/');
+
+  const candidateContent = fs.readFileSync(candidatePath, 'utf-8');
+  assert.ok(candidateContent.includes('Nishakar T'), 'Should contain candidate name');
+  assert.ok(candidateContent.includes('Threshold — AI Governance Platform'), 'Should contain Threshold project');
+  assert.ok(candidateContent.includes('FeedbackStateNode'), 'Should contain FeedbackStateNode');
+  assert.ok(candidateContent.includes('The 8th Node') || candidateContent.includes('8th Node'), 'Should contain 8th Node details');
+  assert.ok(candidateContent.includes('Closed-Loop Learning'), 'Should explain 8th node closed-loop learning');
+  assert.ok(candidateContent.includes('Health Forecast AI'), 'Should contain Health Forecast AI project');
+  assert.ok(candidateContent.includes('SMOTE'), 'Should detail SMOTE for class imbalance');
+  assert.ok(candidateContent.includes('class_weight'), 'Should detail class weighting');
+  assert.ok(candidateContent.includes('PR-AUC'), 'Should detail PR-AUC and F2-Score');
+  assert.ok(candidateContent.includes('0.32'), 'Should detail optimal probability cutoff ~0.32');
+  assert.ok(candidateContent.includes('Intel Unnati'), 'Should detail Intel Unnati internship');
+  assert.ok(candidateContent.includes('Isolation Forest'), 'Should detail Isolation Forest');
+  assert.ok(candidateContent.includes('SolidWorks'), 'Should detail SolidWorks CV project');
+  assert.ok(candidateContent.includes('FloatChat'), 'Should detail FloatChat');
+
+  const modesManagerPath = path.join(projectRoot, 'electron', 'services', 'ModesManager.ts');
+  const modesManagerContent = fs.readFileSync(modesManagerPath, 'utf-8');
+  assert.ok(modesManagerContent.includes('Candidate_Portfolio_and_Projects.md'), 'ModesManager should attach candidate portfolio');
+
+  const whatToAnswerPath = path.join(projectRoot, 'electron', 'llm', 'WhatToAnswerLLM.ts');
+  const whatToAnswerContent = fs.readFileSync(whatToAnswerPath, 'utf-8');
+  assert.ok(whatToAnswerContent.includes('getCandidatePortfolioContent'), 'WhatToAnswerLLM should load candidate portfolio');
+  assert.ok(whatToAnswerContent.includes('health forecast'), 'WhatToAnswerLLM regex should include health forecast');
+  assert.ok(whatToAnswerContent.includes('8th node'), 'WhatToAnswerLLM regex should include 8th node');
+  assert.ok(whatToAnswerContent.includes('threshold'), 'WhatToAnswerLLM regex should include threshold');
+
+  const enginePath = path.join(projectRoot, 'electron', 'IntelligenceEngine.ts');
+  const engineContent = fs.readFileSync(enginePath, 'utf-8');
+  assert.ok(engineContent.includes('IMPERATIVE_ASK.test(userText)'), 'IntelligenceEngine should recognize imperative user questions');
+
+  const promptsPath = path.join(projectRoot, 'electron', 'llm', 'prompts.ts');
+  const promptsContent = fs.readFileSync(promptsPath, 'utf-8');
+  assert.ok(promptsContent.includes('ZERO TRANSCRIPT POLLUTION'), 'prompts.ts should enforce ZERO TRANSCRIPT POLLUTION');
+  assert.ok(promptsContent.includes('CANDIDATE PROJECTS & GROUNDING'), 'prompts.ts should enforce CANDIDATE PROJECTS & GROUNDING');
+});

@@ -760,6 +760,15 @@ export class ModesManager {
             const sdeMode = modes.find(m => m.templateType === 'sde-interview');
             const aimlMode = modes.find(m => m.templateType === 'aiml-interview');
 
+            const candidateCandidates = [
+                path.resolve(__dirname, '../../knowledge-books/Candidate_Portfolio_and_Projects.md'),
+                path.resolve(__dirname, '../../resources/knowledge-books/Candidate_Portfolio_and_Projects.md'),
+                path.resolve(process.cwd(), 'knowledge-books/Candidate_Portfolio_and_Projects.md'),
+                path.resolve(process.cwd(), 'resources/knowledge-books/Candidate_Portfolio_and_Projects.md'),
+            ];
+            const candidatePath = candidateCandidates.find((p: string) => fs.existsSync(p));
+            const candidateContent = candidatePath && fs.existsSync(candidatePath) ? fs.readFileSync(candidatePath, 'utf-8') : '';
+
             const candidates = [
                 path.resolve(__dirname, '../../knowledge-books/SDE_Interview_Official_Handbook.md'),
                 path.resolve(__dirname, '../../resources/knowledge-books/SDE_Interview_Official_Handbook.md'),
@@ -787,6 +796,14 @@ export class ModesManager {
                     });
                     console.log('[ModesManager] Attached SDE_Interview_Official_Handbook.md to sde-interview mode');
                 }
+                if (candidateContent && !existingFiles.some(f => f.fileName.includes('Candidate_Portfolio_and_Projects'))) {
+                    this.addReferenceFile({
+                        modeId: sdeMode.id,
+                        fileName: 'Candidate_Portfolio_and_Projects.md',
+                        content: candidateContent,
+                    });
+                    console.log('[ModesManager] Attached Candidate_Portfolio_and_Projects.md to sde-interview mode');
+                }
             }
 
             if (aimlMode && aimlPath) {
@@ -799,6 +816,14 @@ export class ModesManager {
                         content,
                     });
                     console.log('[ModesManager] Attached AIML_Interview_Official_Handbook.md to aiml-interview mode');
+                }
+                if (candidateContent && !existingFiles.some(f => f.fileName.includes('Candidate_Portfolio_and_Projects'))) {
+                    this.addReferenceFile({
+                        modeId: aimlMode.id,
+                        fileName: 'Candidate_Portfolio_and_Projects.md',
+                        content: candidateContent,
+                    });
+                    console.log('[ModesManager] Attached Candidate_Portfolio_and_Projects.md to aiml-interview mode');
                 }
             }
         } catch (e: any) {

@@ -18817,18 +18817,28 @@ export function initializeIpcHandlers(appState: AppState): void {
         path.resolve(__dirname, '../../knowledge-books/SDE_Interview_Official_Handbook.md'),
         path.resolve(__dirname, '../../resources/knowledge-books/SDE_Interview_Official_Handbook.md'),
         path.resolve(process.cwd(), 'knowledge-books/SDE_Interview_Official_Handbook.md'),
+        path.resolve(process.cwd(), 'resources/knowledge-books/SDE_Interview_Official_Handbook.md'),
       ];
       const aimlCandidates = [
         path.resolve(__dirname, '../../knowledge-books/AIML_Interview_Official_Handbook.md'),
         path.resolve(__dirname, '../../resources/knowledge-books/AIML_Interview_Official_Handbook.md'),
         path.resolve(process.cwd(), 'knowledge-books/AIML_Interview_Official_Handbook.md'),
+        path.resolve(process.cwd(), 'resources/knowledge-books/AIML_Interview_Official_Handbook.md'),
+      ];
+      const candidateCandidates = [
+        path.resolve(__dirname, '../../knowledge-books/Candidate_Portfolio_and_Projects.md'),
+        path.resolve(__dirname, '../../resources/knowledge-books/Candidate_Portfolio_and_Projects.md'),
+        path.resolve(process.cwd(), 'knowledge-books/Candidate_Portfolio_and_Projects.md'),
+        path.resolve(process.cwd(), 'resources/knowledge-books/Candidate_Portfolio_and_Projects.md'),
       ];
 
       const sdePath = sdeCandidates.find((p: string) => fs.existsSync(p)) || sdeCandidates[0];
       const aimlPath = aimlCandidates.find((p: string) => fs.existsSync(p)) || aimlCandidates[0];
+      const candidatePath = candidateCandidates.find((p: string) => fs.existsSync(p)) || candidateCandidates[0];
 
       const sdeContent = fs.existsSync(sdePath) ? fs.readFileSync(sdePath, 'utf-8') : '';
       const aimlContent = fs.existsSync(aimlPath) ? fs.readFileSync(aimlPath, 'utf-8') : '';
+      const candidateContent = fs.existsSync(candidatePath) ? fs.readFileSync(candidatePath, 'utf-8') : '';
 
       return {
         success: true,
@@ -18849,6 +18859,14 @@ export function initializeIpcHandlers(appState: AppState): void {
             path: aimlPath,
             content: aimlContent,
           },
+          {
+            id: 'candidate-portfolio',
+            title: 'Candidate Technical Portfolio & Projects (Nishakar T)',
+            role: 'all',
+            fileName: 'Candidate_Portfolio_and_Projects.md',
+            path: candidatePath,
+            content: candidateContent,
+          },
         ],
       };
     } catch (e: any) {
@@ -18863,15 +18881,24 @@ export function initializeIpcHandlers(appState: AppState): void {
         path.resolve(__dirname, '../../knowledge-books/SDE_Interview_Official_Handbook.md'),
         path.resolve(__dirname, '../../resources/knowledge-books/SDE_Interview_Official_Handbook.md'),
         path.resolve(process.cwd(), 'knowledge-books/SDE_Interview_Official_Handbook.md'),
+        path.resolve(process.cwd(), 'resources/knowledge-books/SDE_Interview_Official_Handbook.md'),
       ];
       const aimlCandidates = [
         path.resolve(__dirname, '../../knowledge-books/AIML_Interview_Official_Handbook.md'),
         path.resolve(__dirname, '../../resources/knowledge-books/AIML_Interview_Official_Handbook.md'),
         path.resolve(process.cwd(), 'knowledge-books/AIML_Interview_Official_Handbook.md'),
+        path.resolve(process.cwd(), 'resources/knowledge-books/AIML_Interview_Official_Handbook.md'),
+      ];
+      const candidateCandidates = [
+        path.resolve(__dirname, '../../knowledge-books/Candidate_Portfolio_and_Projects.md'),
+        path.resolve(__dirname, '../../resources/knowledge-books/Candidate_Portfolio_and_Projects.md'),
+        path.resolve(process.cwd(), 'knowledge-books/Candidate_Portfolio_and_Projects.md'),
+        path.resolve(process.cwd(), 'resources/knowledge-books/Candidate_Portfolio_and_Projects.md'),
       ];
 
+      const isCandidate = bookId === 'candidate-portfolio' || bookId === 'candidate';
       const isAiml = bookId === 'aiml-handbook' || bookId === 'aiml' || bookId === 'aiml-interview';
-      const targetPath = (isAiml ? aimlCandidates : sdeCandidates).find((p: string) => fs.existsSync(p));
+      const targetPath = (isCandidate ? candidateCandidates : isAiml ? aimlCandidates : sdeCandidates).find((p: string) => fs.existsSync(p));
 
       if (targetPath && fs.existsSync(targetPath)) {
         const err = await shell.openPath(targetPath);

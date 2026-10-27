@@ -2509,6 +2509,8 @@ export const UNIVERSAL_WHAT_TO_ANSWER_PROMPT = `${CORE_IDENTITY}
    4. If active mode instructions define a question count, language order, bilingual format, flags, or workshop style, satisfy those exactly.
    5. If no active mode format is present, keep simple questions to 1-3 sentences max.
    6. Must sound like a real person in the live conversation. Answer → Stop.
+   7. ZERO TRANSCRIPT POLLUTION: Never use casual warmup speech, practicing exercises, or random words from earlier audio turns (e.g. practicing machine learning formulas or random speech fragments) to answer an unrelated technical question. Only answer the EXACT current question asked in <current_turn>.
+   8. CANDIDATE PROJECTS & GROUNDING: If the question asks about the candidate's projects (such as "Health Forecast AI", "Threshold Governance", "Hospital Readmission", "8th Node", "Intel Unnati", "SolidWorks", "FloatChat"), answer strictly and accurately from the candidate dossier or resume facts in confident first person. NEVER invent nonsensical techniques (e.g. NEVER claim linear regression was used for classification class imbalance).
 
    Output ONLY the answer. Nothing else.`;
 

@@ -66,6 +66,30 @@ async function raceWithBudget<T>(promise: Promise<T>, ms: number, fallback: T): 
     });
 }
 
+let _cachedCandidatePortfolio: string | null = null;
+function getCandidatePortfolioContent(): string {
+    if (typeof _cachedCandidatePortfolio === 'string') return _cachedCandidatePortfolio;
+    try {
+        const fs = require('fs');
+        const path = require('path');
+        const candidates = [
+            path.resolve(__dirname, '../../knowledge-books/Candidate_Portfolio_and_Projects.md'),
+            path.resolve(__dirname, '../../resources/knowledge-books/Candidate_Portfolio_and_Projects.md'),
+            path.resolve(process.cwd(), 'knowledge-books/Candidate_Portfolio_and_Projects.md'),
+            path.resolve(process.cwd(), 'resources/knowledge-books/Candidate_Portfolio_and_Projects.md'),
+        ];
+        const found = candidates.find((p: string) => fs.existsSync(p));
+        if (found) {
+            const content = fs.readFileSync(found, 'utf-8') as string;
+            _cachedCandidatePortfolio = content;
+            return content;
+        }
+    } catch (e: any) {
+        console.warn('[WhatToAnswerLLM] Failed to load candidate portfolio:', e?.message || e);
+    }
+    return '';
+}
+
 // Dynamically imported to avoid circular dependency at module load time
 type ModesManagerType = {
     getInstance: () => {
@@ -1228,9 +1252,27 @@ The user triggered this action with a coding problem on screen and NO new questi
                 extra: { v3Sections: _v3p?.sections ?? null, activeSkill: activeSkill?.id ?? null, hasImages: hasAttachedImages },
             });
 
-            // ── TAVILY SEARCH INTEGRATION FOR INTERVIEWS ──
+            // ── TAVILY SEARCH INTEGRATION & CANDIDATE DOSSIER GROUNDING FOR INTERVIEWS ──
             const resolvedQuestionText = (answerPlan?.question || '').trim();
-            const isCandidateSelfQuery = /(tell (me )?about (my|your) (experience|background|projects?|work|career)|tell me about yourself|who (am i|are you)|walk me through (my|your) (resume|background|cv)|what is (my|your) (experience|background)|what are (my|your) (skills|strengths|weaknesses)|what projects have (i|you) worked on|why should we hire you|my projects?|my resume)/i.test(resolvedQuestionText);
+            const isCandidateSelfQuery = /(tell (me )?about (my|your) (experience|background|projects?|work|career)|tell me about yourself|who (am i|are you)|walk me through (my|your) (resume|background|cv)|what is (my|your) (experience|background)|what are (my|your) (skills|strengths|weaknesses)|what projects have (i|you) worked on|why should we hire you|my projects?|my resume|health forecast|threshold|readmission|re-admission|8th node|state machine|governance|intel unnati|solidworks|floatchat|github|what('?s| is) (your|my) current role|what are you working on|quick overview of (your|my) (actual )?(background|projects?|work)|class imbalance|resampling|classmates)/i.test(resolvedQuestionText);
+
+            let candidateDossierBlock = '';
+            if (isCandidateSelfQuery) {
+                const portfolio = getCandidatePortfolioContent();
+                if (portfolio) {
+                    candidateDossierBlock = `\n\n## CANDIDATE BACKGROUND, PROJECTS & RESUME DOSSIER (NISHAKAR T):\n${portfolio}\n\nCRITICAL INSTRUCTION FOR CANDIDATE PROJECT & BACKGROUND QUESTIONS:
+The candidate (Nishakar T) is answering the interviewer in first person ("In my project...", "I designed...", "I built...", "My background is...").
+Ground the response directly and specifically in the technical facts from the dossier above:
+- For Health Forecast AI / Hospital Readmission Model: The positive class (readmitted patients) was ~11%. Handled via SMOTE on training splits, class-weighted Random Forest & XGBoost (class_weight='balanced', penalizing false negatives), evaluated with PR-AUC and F2-score, and decision threshold tuned to ~0.32. NEVER mention linear regression for class imbalance!
+- For Threshold AI Governance Platform: Multi-agent system (BaseAgent, PlannerAgent, GovernanceAgent, ReviewAgent) with graduated autonomy. The 8th Node (FeedbackStateNode) is the closed-loop learning and policy adaptation node that captures human administrator approve/reject decisions to update Bayesian risk parameters and dynamically tune autonomy thresholds.
+- For Intel Unnati: IoT Digital Twin backend using FastAPI and WebSockets, Isolation Forest for anomaly detection, XGBoost Regressor for Remaining Useful Life (RUL) estimation.
+- For SolidWorks: PyTorch CNN parts counter on 10,000+ images, 96.53% exact accuracy.
+- For Elevator Pitch / Background: 3-4 crisp, confident spoken sentences highlighting scalable backends, multi-agent AI, and ML systems.
+- Format: Deliver a clean, natural conversational spoken answer ready for the candidate to speak aloud.`;
+                    _wtaSystemPrompt = `${_wtaSystemPrompt}\n${candidateDossierBlock}`;
+                }
+            }
+
             const isTechnicalOrConceptual = !isCandidateSelfQuery && (
                 answerPlan?.answerType === 'technical_concept_answer' ||
                 answerPlan?.answerType === 'general_meeting_answer' ||
@@ -1258,9 +1300,11 @@ The user triggered this action with a coding problem on screen and NO new questi
                 }
             }
 
-            // If web research was fetched, prepend it to user message
+            // If candidate dossier or web research was fetched, update user message
             let _effectiveUserMessage = _wtaUserMessage;
-            if (webResearchBlock) {
+            if (candidateDossierBlock) {
+                _effectiveUserMessage = `[CANDIDATE DOSSIER GROUNDING AVAILABLE - ANSWER DIRECTLY AS NISHAKAR]\n${_effectiveUserMessage}`;
+            } else if (webResearchBlock) {
                 _effectiveUserMessage = `${webResearchBlock}\n\n${_wtaUserMessage}`;
             }
 
