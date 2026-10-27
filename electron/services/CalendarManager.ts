@@ -61,7 +61,19 @@ const SCOPES = [
 ];
 /** Bounds the per-calendar requests one sync makes. */
 const MAX_SYNCED_CALENDARS = 20;
-const TOKEN_PATH = path.join(app.getPath('userData'), 'calendar_tokens.enc');
+function getUserDataDir(): string {
+    try {
+        const electron = require('electron');
+        const electronApp = electron?.app || electron?.default?.app || (typeof app !== 'undefined' ? app : undefined);
+        if (electronApp?.getPath) {
+            return electronApp.getPath('userData');
+        }
+    } catch { /* ignore */ }
+    const home = process.env.APPDATA || (process.platform === 'darwin' ? path.join(process.env.HOME || '', 'Library', 'Application Support') : path.join(process.env.HOME || '', '.config'));
+    return path.join(home, 'natively');
+}
+
+const getTokenPath = (): string => path.join(getUserDataDir(), 'calendar_tokens.enc');
 
 /** Token-endpoint errors that mean the stored grant is dead and reconnecting is the only fix. */
 const DEAD_GRANT_ERRORS = new Set(['invalid_grant', 'invalid_client', 'unauthorized_client', 'deleted_client']);
@@ -328,8 +340,8 @@ export class CalendarManager extends EventEmitter {
         this.lastEventsAt = 0;
         this.lastCalendars = null;
 
-        if (fs.existsSync(TOKEN_PATH)) {
-            fs.unlinkSync(TOKEN_PATH);
+        if (fs.existsSync(getTokenPath())) {
+            fs.unlinkSync(getTokenPath());
         }
 
         this.emit('connection-changed', false);
@@ -478,18 +490,20 @@ export class CalendarManager extends EventEmitter {
         });
 
         const encrypted = safeStorage.encryptString(data);
-        const tmpPath = TOKEN_PATH + '.tmp';
+        const tokenPath = getTokenPath();
+        const tmpPath = tokenPath + '.tmp';
         fs.writeFileSync(tmpPath, encrypted);
-        fs.renameSync(tmpPath, TOKEN_PATH);
+        fs.renameSync(tmpPath, tokenPath);
     }
 
     private loadTokens() {
-        if (!fs.existsSync(TOKEN_PATH)) return;
+        const tokenPath = getTokenPath();
+        if (!fs.existsSync(tokenPath)) return;
 
         try {
             if (!safeStorage.isEncryptionAvailable()) return;
 
-            const encrypted = fs.readFileSync(TOKEN_PATH);
+            const encrypted = fs.readFileSync(tokenPath);
             const decrypted = safeStorage.decryptString(encrypted);
             const data = JSON.parse(decrypted);
 

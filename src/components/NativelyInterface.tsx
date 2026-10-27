@@ -1568,10 +1568,11 @@ const NativelyInterface: React.FC<NativelyInterfaceProps> = ({
   };
 
   const resolveRoleSlug = (track: string | null): 'sde' | 'aiml' | 'technical' | 'general' => {
-    const str = (track || '').toLowerCase();
+    if (!track) return 'general';
+    const str = track.toLowerCase().trim();
     if (str.includes('sde') || str.includes('software')) return 'sde';
-    if (str.includes('aiml') || str.includes('ai') || str.includes('ml')) return 'aiml';
-    if (str.includes('technical') || str.includes('tech')) return 'technical';
+    if (str.includes('aiml') || str.includes('ai-ml') || str.includes('ai/ml') || str.includes('machine-learning') || str.includes('machine_learning') || str.includes('ml-interview') || str === 'ai' || str === 'ml') return 'aiml';
+    if (str.includes('technical') || str.includes('system-design') || str === 'tech') return 'technical';
     return 'general';
   };
 

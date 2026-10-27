@@ -17,13 +17,25 @@ import { readActiveCustomProvider } from '../llm/activeCustomProvider';
 import { normalizeSttLanguageKey } from '../config/languages';
 import { resolveSttModel, type SttModelProvider } from '../audio/sttModelCatalog';
 
-const CREDENTIALS_PATH = path.join(app.getPath('userData'), 'credentials.enc');
+function getUserDataDir(): string {
+    try {
+        const electron = require('electron');
+        const electronApp = electron?.app || electron?.default?.app || (typeof app !== 'undefined' ? app : undefined);
+        if (electronApp?.getPath) {
+            return electronApp.getPath('userData');
+        }
+    } catch { /* ignore */ }
+    const home = process.env.APPDATA || (process.platform === 'darwin' ? path.join(process.env.HOME || '', 'Library', 'Application Support') : path.join(process.env.HOME || '', '.config'));
+    return path.join(home, 'natively');
+}
+
+const getCredentialsPath = (): string => path.join(getUserDataDir(), 'credentials.enc');
 // App-managed AES fallback, used ONLY when the OS keyring (safeStorage) is
 // unavailable so keys still survive a restart. See credentialFallbackCrypto.ts for
 // the (honest) security posture: obfuscation-grade, machine-bound, never plaintext.
-const FALLBACK_PATH = path.join(app.getPath('userData'), 'credentials.fallback.enc');
+const getFallbackPath = (): string => path.join(getUserDataDir(), 'credentials.fallback.enc');
 // Per-install random salt for the fallback key derivation (32 raw bytes, 0600).
-const SALT_PATH = path.join(app.getPath('userData'), 'credentials.salt');
+const getSaltPath = (): string => path.join(getUserDataDir(), 'credentials.salt');
 // Counts CONSECUTIVE cold starts that found a keyring file and could not decrypt
 // it. safeStorage.decryptString throws for transient reasons (a locked macOS
 // keychain, a denied access prompt, a roaming DPAPI profile mid-sync) as well as
@@ -32,11 +44,17 @@ const SALT_PATH = path.join(app.getPath('userData'), 'credentials.salt');
 // distinct launches can. Below the threshold we stay quiet and keep waiting for a
 // healthy launch; at it, we stop pretending recovery is coming and ask the user to
 // re-enter. Deleted the moment a load or a re-key proves the keyring readable.
-const DECRYPT_FAIL_PATH = path.join(app.getPath('userData'), 'credentials.decryptfail');
+const getDecryptFailPath = (): string => path.join(getUserDataDir(), 'credentials.decryptfail');
 // Provenance of the two credential files: a sha256 of the exact bytes THIS
 // install last wrote to each. It is the only way to tell a store we wrote from
 // one we merely found — see the recovery re-key decision in loadCredentials().
-const PROVENANCE_PATH = path.join(app.getPath('userData'), 'credentials.provenance.json');
+const getProvenancePath = (): string => path.join(getUserDataDir(), 'credentials.provenance.json');
+
+const CREDENTIALS_PATH = getCredentialsPath();
+const FALLBACK_PATH = getFallbackPath();
+const SALT_PATH = getSaltPath();
+const DECRYPT_FAIL_PATH = getDecryptFailPath();
+const PROVENANCE_PATH = getProvenancePath();
 /**
  * Plaintext of the KEY CANARY stored in provenance beside the credential hash.
  *
@@ -452,6 +470,7 @@ export class CredentialsManager {
      */
     public init(): void {
         this.loadCredentials();
+        this.emitStorageStatusDiagnostic('startup');
         if (process.env.USE_OLLAMA === 'true') {
             if (
                 !this.credentials.sttProvider ||
@@ -460,7 +479,7 @@ export class CredentialsManager {
                 (this.credentials.sttProvider === 'google' && !this.credentials.googleServiceAccountPath)
             ) {
                 this.credentials.sttProvider = 'local-whisper';
-                if (!this.wasExistingStoreUnreadable()) {
+                if (!this.refuseWriteWhileDegraded('default stt provider') && !this.wasExistingStoreUnreadable()) {
                     this.saveCredentials();
                 }
                 console.log('[CredentialsManager] Defaulted sttProvider to local-whisper for 100% free offline mode');

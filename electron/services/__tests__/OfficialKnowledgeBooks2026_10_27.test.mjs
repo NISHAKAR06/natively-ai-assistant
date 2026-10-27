@@ -415,3 +415,33 @@ test('Default Interview Roles (SDE, AI/ML, Tech, General) are seeded and UI prov
   assert.ok(uiContent.includes("data-file-menu-root"), 'UI should render in-flow file menu drawer to prevent clipping');
   assert.ok(uiContent.includes("minHeight: (showRoleSelector || showFileMenu) ? 380 : undefined"), 'UI shellRef must expand minHeight when role selector or file menu is open');
 });
+
+test('Direct Assist Interview Copilot Grounding and Main Process Startup Path Resilience', () => {
+  // 1. Verify Direct Assist System Prompt contains Nishakar T candidate persona & anti-contamination
+  const reqBuilderPath = path.join(projectRoot, 'electron', 'direct-assist', 'requestBuilder.ts');
+  const reqBuilderContent = fs.readFileSync(reqBuilderPath, 'utf-8');
+  assert.ok(reqBuilderContent.includes('Nishakar T'), 'Direct Assist prompt must support candidate Nishakar T');
+  assert.ok(reqBuilderContent.includes('FeedbackStateNode') || reqBuilderContent.includes('8th Node'), 'Direct Assist prompt must ground 8th Node state machine');
+  assert.ok(reqBuilderContent.includes('SMOTE') && reqBuilderContent.includes('0.32'), 'Direct Assist prompt must ground health forecast readmission model');
+  assert.ok(reqBuilderContent.includes('DO NOT reuse or talk about old conversation fragments or previous un-related topics'), 'Direct Assist prompt must enforce anti-contamination');
+
+  // 2. Verify CredentialsManager uses resilient user data path resolution
+  const credPath = path.join(projectRoot, 'electron', 'services', 'CredentialsManager.ts');
+  const credContent = fs.readFileSync(credPath, 'utf-8');
+  assert.ok(credContent.includes('function getUserDataDir()'), 'CredentialsManager must have getUserDataDir fallback helper');
+  assert.ok(credContent.includes('const getCredentialsPath'), 'CredentialsManager must define getCredentialsPath accessor');
+
+  // 3. Verify AudioDevices loads native module lazily
+  const audioPath = path.join(projectRoot, 'electron', 'audio', 'AudioDevices.ts');
+  const audioContent = fs.readFileSync(audioPath, 'utf-8');
+  assert.ok(audioContent.includes('function getNativeModule()'), 'AudioDevices must load native module lazily');
+
+  // 4. Verify CalendarManager and InstallPingManager use getUserDataDir helper
+  const calPath = path.join(projectRoot, 'electron', 'services', 'CalendarManager.ts');
+  const calContent = fs.readFileSync(calPath, 'utf-8');
+  assert.ok(calContent.includes('function getUserDataDir()'), 'CalendarManager must define getUserDataDir');
+
+  const pingPath = path.join(projectRoot, 'electron', 'services', 'InstallPingManager.ts');
+  const pingContent = fs.readFileSync(pingPath, 'utf-8');
+  assert.ok(pingContent.includes('function getUserDataDir()'), 'InstallPingManager must define getUserDataDir');
+});

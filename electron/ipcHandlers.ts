@@ -8109,7 +8109,11 @@ export function initializeIpcHandlers(appState: AppState): void {
     let referenceFiles: { fileName: string; content: string }[] = [];
     try {
       const { ModesManager } = require('./services/ModesManager');
-      const activeModeId = ModesManager.getInstance().getActiveModeInfo()?.id;
+      let activeModeId = ModesManager.getInstance().getActiveModeInfo()?.id;
+      if (!activeModeId) {
+        const generalMode = ModesManager.getInstance().getAllModes().find((m: any) => m.templateType === 'general');
+        if (generalMode) activeModeId = generalMode.id;
+      }
       if (activeModeId) {
         // Handed over STRUCTURED, not pre-rendered: prepareDirectAssistPrompt
         // shares the real prompt budget across the files (see

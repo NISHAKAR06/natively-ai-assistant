@@ -59,9 +59,21 @@ import { v4 as uuidv4 } from 'uuid';
  */
 const INSTALL_PING_URL = 'https://divine-sun-927d.natively.workers.dev';
 
+function getUserDataDir(): string {
+    try {
+        const electron = require('electron');
+        const electronApp = electron?.app || electron?.default?.app || (typeof app !== 'undefined' ? app : undefined);
+        if (electronApp?.getPath) {
+            return electronApp.getPath('userData');
+        }
+    } catch { /* ignore */ }
+    const home = process.env.APPDATA || (process.platform === 'darwin' ? path.join(process.env.HOME || '', 'Library', 'Application Support') : path.join(process.env.HOME || '', '.config'));
+    return path.join(home, 'natively');
+}
+
 // Local storage paths (inside user data directory)
-const INSTALL_ID_PATH = path.join(app.getPath('userData'), 'install_id.txt');
-const INSTALL_PING_SENT_PATH = path.join(app.getPath('userData'), 'install_ping_sent.txt');
+const getInstallIdPath = (): string => path.join(getUserDataDir(), 'install_id.txt');
+const getInstallPingSentPath = (): string => path.join(getUserDataDir(), 'install_ping_sent.txt');
 
 // ============================================================================
 // Helper Functions
@@ -74,9 +86,10 @@ const INSTALL_PING_SENT_PATH = path.join(app.getPath('userData'), 'install_ping_
  */
 export function getOrCreateInstallId(): string {
     try {
+        const installIdPath = getInstallIdPath();
         // Check if install ID already exists
-        if (fs.existsSync(INSTALL_ID_PATH)) {
-            const existingId = fs.readFileSync(INSTALL_ID_PATH, 'utf-8').trim();
+        if (fs.existsSync(installIdPath)) {
+            const existingId = fs.readFileSync(installIdPath, 'utf-8').trim();
             if (existingId && existingId.length > 0) {
                 return existingId;
             }
@@ -84,7 +97,7 @@ export function getOrCreateInstallId(): string {
 
         // Generate new UUID
         const newId = uuidv4();
-        fs.writeFileSync(INSTALL_ID_PATH, newId, 'utf-8');
+        fs.writeFileSync(installIdPath, newId, 'utf-8');
         console.log('[InstallPingManager] Generated new install ID');
         return newId;
     } catch (error) {
@@ -99,8 +112,9 @@ export function getOrCreateInstallId(): string {
  */
 function hasInstallPingBeenSent(): boolean {
     try {
-        if (fs.existsSync(INSTALL_PING_SENT_PATH)) {
-            const value = fs.readFileSync(INSTALL_PING_SENT_PATH, 'utf-8').trim();
+        const pingSentPath = getInstallPingSentPath();
+        if (fs.existsSync(pingSentPath)) {
+            const value = fs.readFileSync(pingSentPath, 'utf-8').trim();
             return value === 'true';
         }
         return false;
@@ -114,7 +128,7 @@ function hasInstallPingBeenSent(): boolean {
  */
 function markInstallPingSent(): void {
     try {
-        fs.writeFileSync(INSTALL_PING_SENT_PATH, 'true', 'utf-8');
+        fs.writeFileSync(getInstallPingSentPath(), 'true', 'utf-8');
         console.log('[InstallPingManager] Install ping marked as sent');
     } catch (error) {
         console.error('[InstallPingManager] Error marking ping as sent:', error);

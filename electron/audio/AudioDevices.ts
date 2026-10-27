@@ -1,10 +1,14 @@
 import { loadNativeModule } from './nativeModuleLoader';
 import { filterSelectableDevices } from './audioDeviceSelection.mjs';
 
-// NativeModule may be null if the Rust binary isn't built yet (new clone without `npm run build:native`).
-// All methods below handle this gracefully by returning empty arrays.
-const NativeModule: any = loadNativeModule();
-const { getInputDevices, getOutputDevices } = NativeModule || {};
+// NativeModule is loaded lazily on first call so early module require does not attempt to resolve electron before ready.
+let _nativeModule: any = undefined;
+function getNativeModule(): any {
+    if (_nativeModule === undefined) {
+        _nativeModule = loadNativeModule();
+    }
+    return _nativeModule;
+}
 
 export interface AudioDevice {
     id: string;
@@ -13,6 +17,8 @@ export interface AudioDevice {
 
 export class AudioDevices {
     public static getInputDevices(): AudioDevice[] {
+        const mod = getNativeModule();
+        const getInputDevices = mod?.getInputDevices;
         if (!getInputDevices) {
             console.warn('[AudioDevices] Native functionality not available');
             return [];
@@ -35,6 +41,8 @@ export class AudioDevices {
     }
 
     public static getOutputDevices(): AudioDevice[] {
+        const mod = getNativeModule();
+        const getOutputDevices = mod?.getOutputDevices;
         if (!getOutputDevices) {
             console.warn('[AudioDevices] Native functionality not available');
             return [];
