@@ -12,3 +12,12 @@ if not defined USE_OLLAMA set USE_OLLAMA=true
 if not defined OLLAMA_MODEL set OLLAMA_MODEL=qwen2.5-coder:7b
 start "" /D "%APP_DIR%" "%APP_DIR%\node_modules\electron\dist\electron.exe" "%APP_DIR%"
 echo Natively launched in standalone background mode (100% free local AI + STT).
+echo N       N
+echo NN      N
+echo N N     N
+echo N  N    N
+echo N   N   N
+echo N    N  N
+echo N     N N
+echo N      NN
+echo N       N

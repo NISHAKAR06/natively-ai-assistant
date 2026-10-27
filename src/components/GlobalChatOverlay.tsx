@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useStreamBuffer } from '../hooks/useStreamBuffer';
-import { X, Copy, Check, Globe, ArrowUp, BookOpen } from 'lucide-react';
+import { X, Copy, Check, Globe, ArrowUp, BookOpen, FolderOpen } from 'lucide-react';
 import { DiagramAwareMarkdown } from './diagram/DiagramAwareMarkdown';
 import { motion, AnimatePresence } from 'framer-motion';
 import { genMessageId } from '../utils/messageId';
@@ -156,8 +156,29 @@ const GlobalChatOverlay: React.FC<GlobalChatOverlayProps> = ({
         title: string;
         fileName: string;
         content: string;
+        filePath?: string;
+        fileId?: string;
         bookId?: string;
     } | null>(null);
+
+    const handlePickAndOpenFile = async () => {
+        try {
+            const api = (window as any).electronAPI;
+            const res = await api?.modesPickAndOpenFile?.();
+            if (res?.success && res.content) {
+                setViewingFile({
+                    isOpen: true,
+                    title: res.fileName || 'Opened File',
+                    fileName: res.fileName || 'file',
+                    content: res.content,
+                    filePath: res.filePath,
+                    bookId: 'custom-file',
+                });
+            }
+        } catch (e) {
+            console.error('Error picking file:', e);
+        }
+    };
 
     const handleOpenHandbook = async (bookId: 'sde-handbook' | 'aiml-handbook') => {
         const api = (window as any).electronAPI;
@@ -177,6 +198,7 @@ const GlobalChatOverlay: React.FC<GlobalChatOverlayProps> = ({
                         title: found.title,
                         fileName: found.fileName,
                         content: found.content,
+                        filePath: found.path,
                         bookId: found.id,
                     });
                 }
@@ -587,6 +609,14 @@ const GlobalChatOverlay: React.FC<GlobalChatOverlayProps> = ({
                             </div>
                             <div className="flex items-center gap-2">
                                 <button
+                                    onClick={() => void handlePickAndOpenFile()}
+                                    className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border border-emerald-500/40 bg-emerald-500/15 text-emerald-300 hover:bg-emerald-500/25 transition-all cursor-pointer"
+                                    title="Open file from computer (.md, .txt, .py, code, doc)"
+                                >
+                                    <FolderOpen size={12} className="text-emerald-400" />
+                                    <span>File Open</span>
+                                </button>
+                                <button
                                     onClick={() => void handleOpenHandbook('sde-handbook')}
                                     className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border border-cyan-500/30 bg-cyan-500/10 text-cyan-300 hover:bg-cyan-500/20 transition-all cursor-pointer"
                                     title="View Official SDE Interview Handbook (DSA, System Design, W3Schools Q&A)"
@@ -645,8 +675,18 @@ const GlobalChatOverlay: React.FC<GlobalChatOverlayProps> = ({
                                     onChange={(e) => setQuery(e.target.value)}
                                     onKeyDown={handleInputKeyDown}
                                     placeholder="Ask me anything..."
-                                    className="w-full pl-5 pr-12 py-3 bg-bg-elevated shadow-[0_8px_30px_rgb(0,0,0,0.12)] border border-border-muted rounded-full text-sm text-text-primary placeholder-text-tertiary/70 focus:outline-none transition-all"
+                                    className="w-full pl-5 pr-20 py-3 bg-bg-elevated shadow-[0_8px_30px_rgb(0,0,0,0.12)] border border-border-muted rounded-full text-sm text-text-primary placeholder-text-tertiary/70 focus:outline-none transition-all"
                                 />
+                                <div className="absolute right-10 top-1/2 -translate-y-1/2 flex items-center">
+                                    <button
+                                        type="button"
+                                        onClick={() => void handlePickAndOpenFile()}
+                                        title="Open file from computer (.md, code, doc)"
+                                        className="p-1.5 text-text-tertiary hover:text-emerald-400 transition-colors"
+                                    >
+                                        <FolderOpen size={15} />
+                                    </button>
+                                </div>
                                 <button
                                     onClick={() => {
                                         if (query.trim()) {
@@ -672,6 +712,8 @@ const GlobalChatOverlay: React.FC<GlobalChatOverlayProps> = ({
                     title={viewingFile.title}
                     fileName={viewingFile.fileName}
                     content={viewingFile.content}
+                    filePath={viewingFile.filePath}
+                    fileId={viewingFile.fileId}
                     bookId={viewingFile.bookId}
                 />
             )}

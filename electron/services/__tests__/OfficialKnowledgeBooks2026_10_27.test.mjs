@@ -147,4 +147,14 @@ test('Interface exposes direct File Open button, menu, and native OS desktop lau
   const fileViewerContent = fs.readFileSync(fileViewerPath, 'utf-8');
   assert.ok(fileViewerContent.includes('filePath'), 'FileViewerModal should accept filePath prop');
   assert.ok(fileViewerContent.includes('modesOpenPathNative'), 'FileViewerModal should use modesOpenPathNative');
+
+  const globalChatPath = path.join(projectRoot, 'src', 'components', 'GlobalChatOverlay.tsx');
+  const globalChatContent = fs.readFileSync(globalChatPath, 'utf-8');
+  assert.ok(globalChatContent.includes('handlePickAndOpenFile'), 'GlobalChatOverlay should support handlePickAndOpenFile');
+  assert.ok(globalChatContent.includes('File Open'), 'GlobalChatOverlay should render File Open button');
+
+  const launcherPath = path.join(projectRoot, 'src', 'components', 'Launcher.tsx');
+  const launcherContent = fs.readFileSync(launcherPath, 'utf-8');
+  assert.ok(launcherContent.includes('handlePickAndOpenFile'), 'Launcher should support handlePickAndOpenFile');
+  assert.ok(launcherContent.includes('FolderOpen'), 'Launcher should render FolderOpen icon');
 });

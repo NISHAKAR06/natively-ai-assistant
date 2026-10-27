@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useT } from '../i18n';
-import { ToggleLeft, ToggleRight, Search, Calendar, MoreHorizontal, Globe, Clock, ChevronRight, Settings, LayoutGrid, RefreshCw, Eye, EyeOff, Ghost, Plus, Mail, Link as LinkIcon, ChevronDown, Trash2, Bell, Download, DownloadCloud, CheckCircle, AlertCircle, User, UserSearch, Sparkles, ArrowUpRight } from 'lucide-react';
+import { ToggleLeft, ToggleRight, Search, Calendar, MoreHorizontal, Globe, Clock, ChevronRight, Settings, LayoutGrid, RefreshCw, Eye, EyeOff, Ghost, Plus, Mail, Link as LinkIcon, ChevronDown, Trash2, Bell, Download, DownloadCloud, CheckCircle, AlertCircle, User, UserSearch, Sparkles, ArrowUpRight, FolderOpen } from 'lucide-react';
 import { generateMeetingPDF } from '../utils/pdfGenerator';
 import icon from "./icon.png";
 import mainui from "../UI_comp/mainui.png";
@@ -11,6 +11,7 @@ import { plainMeetingTitle } from '../lib/codingAnswer.mjs';
 import MeetingDetails from './MeetingDetails';
 import TopSearchPill from './TopSearchPill';
 import GlobalChatOverlay from './GlobalChatOverlay';
+import { FileViewerModal } from './ui/FileViewerModal';
 import { motion, AnimatePresence, useReducedMotion, type TargetAndTransition, type Variants } from 'framer-motion';
 import { FeatureSpotlight } from './FeatureSpotlight';
 import './LauncherCta.css';
@@ -118,6 +119,34 @@ const Launcher: React.FC<LauncherProps> = ({ request, onStartMeeting, onOpenSett
     const [showModesOnboarding, setShowModesOnboarding] = useState(false);
     const [showProfileOnboarding, setShowProfileOnboarding] = useState(false);
     const [launchCount, setLaunchCount] = useState<number>(0);
+    const [viewingFile, setViewingFile] = useState<{
+        isOpen: boolean;
+        title: string;
+        fileName: string;
+        content: string;
+        filePath?: string;
+        fileId?: string;
+        bookId?: string;
+    } | null>(null);
+
+    const handlePickAndOpenFile = async () => {
+        try {
+            const api = (window as any).electronAPI;
+            const res = await api?.modesPickAndOpenFile?.();
+            if (res?.success && res.content) {
+                setViewingFile({
+                    isOpen: true,
+                    title: res.fileName || 'Opened File',
+                    fileName: res.fileName || 'file',
+                    content: res.content,
+                    filePath: res.filePath,
+                    bookId: 'custom-file',
+                });
+            }
+        } catch (e) {
+            console.error('Error picking file:', e);
+        }
+    };
     // StrictMode-safe guard for mount-only side-effects: the dev build
     // intentionally double-invokes effects to surface this class of bug.
     const mountedOnceRef = useRef<boolean>(false);
@@ -891,6 +920,13 @@ const Launcher: React.FC<LauncherProps> = ({ request, onStartMeeting, onOpenSett
                         </AnimatePresence>
                     </div>
                     <button
+                        onClick={() => void handlePickAndOpenFile()}
+                        title={t("Open File: View Markdown, code, or documents")}
+                        className={`p-2 text-text-secondary hover:text-emerald-400 transition-all duration-300 ${isLight ? 'hover:drop-shadow-[0_0_6px_rgba(0,0,0,0.25)]' : 'hover:drop-shadow-[0_0_8px_rgba(52,211,153,0.5)]'}`}
+                    >
+                        <FolderOpen size={18} />
+                    </button>
+                    <button
                         onClick={() => {
                             onOpenSettings();
                         }}
@@ -1396,6 +1432,19 @@ const Launcher: React.FC<LauncherProps> = ({ request, onStartMeeting, onOpenSett
                 }}
                 initialQuery={submittedGlobalQuery}
             />
+
+            {viewingFile && (
+                <FileViewerModal
+                    isOpen={viewingFile.isOpen}
+                    onClose={() => setViewingFile(null)}
+                    title={viewingFile.title}
+                    fileName={viewingFile.fileName}
+                    content={viewingFile.content}
+                    filePath={viewingFile.filePath}
+                    fileId={viewingFile.fileId}
+                    bookId={viewingFile.bookId}
+                />
+            )}
         </div >
     );
 };
