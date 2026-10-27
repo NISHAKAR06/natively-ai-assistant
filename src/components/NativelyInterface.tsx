@@ -26,6 +26,7 @@ import {
   FolderOpen,
   FileText,
   ExternalLink,
+  User,
 } from 'lucide-react';
 import { FileViewerModal } from './ui/FileViewerModal';
 import { AddCustomFileModal } from './ui/AddCustomFileModal';
@@ -1516,7 +1517,7 @@ const NativelyInterface: React.FC<NativelyInterfaceProps> = ({
     }
   };
 
-  const handleOpenHandbook = async (targetId: 'sde' | 'aiml') => {
+  const handleOpenHandbook = async (targetId: 'sde' | 'aiml' | 'candidate') => {
     setShowFileMenu(false);
     const api = (window as any).electronAPI;
     if (!api?.knowledgeBooksGetBooks) return;
@@ -1538,6 +1539,18 @@ const NativelyInterface: React.FC<NativelyInterfaceProps> = ({
       }
     } catch (err) {
       console.error('Error opening handbook:', err);
+    }
+  };
+
+  const handleOpenNativeHandbook = async (targetId: 'sde' | 'aiml' | 'candidate') => {
+    setShowFileMenu(false);
+    const api = (window as any).electronAPI;
+    try {
+      if (api?.knowledgeBooksOpenBook) {
+        await api.knowledgeBooksOpenBook(targetId);
+      }
+    } catch (e) {
+      console.error('Failed to open native handbook:', e);
     }
   };
 
@@ -3335,6 +3348,14 @@ const NativelyInterface: React.FC<NativelyInterfaceProps> = ({
     // callback a new identity every frame, tearing down and rebuilding the
     // ResizeObserver (and every effect keyed on it) each time.
   }, [attachedContext.length, syncStreamingHeightBaseline, adoptAppliedSize]);
+
+  useEffect(() => {
+    // When handbook viewer opens or closes, trigger size report so Electron window adapts smoothly
+    const timer = setTimeout(() => {
+      reportShellSize();
+    }, 60);
+    return () => clearTimeout(timer);
+  }, [handbookViewer, reportShellSize]);
 
   // Compute the vertical budget cap for the chat scroll area and push it into
   // the `verticalCap` motion value (which scrollMaxH mins against the
@@ -11987,6 +12008,38 @@ Provide only the answer, nothing else.`;
                   stacking order against the card's other children is unchanged.
                   Always mounted: it is the box that plays the contract to 0 after
                   the scroller has gone. */}
+              {handbookViewer && (
+                <div className="w-full px-3 py-1">
+                  <FileViewerModal
+                    isOpen={handbookViewer.isOpen}
+                    onClose={() => setHandbookViewer(null)}
+                    title={handbookViewer.title}
+                    fileName={handbookViewer.fileName}
+                    content={handbookViewer.content}
+                    filePath={handbookViewer.filePath}
+                    fileId={handbookViewer.fileId}
+                    bookId={handbookViewer.bookId}
+                    availableBooks={handbookViewer.availableBooks}
+                    onSelectBook={(selected) => {
+                      setHandbookViewer((prev) =>
+                        prev
+                          ? {
+                              ...prev,
+                              title: selected.title,
+                              fileName: selected.fileName,
+                              content: selected.content,
+                              filePath: (selected as any).path || prev.filePath,
+                              bookId: selected.id,
+                            }
+                          : null
+                      );
+                    }}
+                    embedded={true}
+                  />
+                </div>
+              )}
+
+              {!handbookViewer && (
               <motion.div
                 ref={viewportBoxRef}
                 data-viewport-box=""
@@ -12096,6 +12149,7 @@ Provide only the answer, nothing else.`;
                 </motion.div>
               )}
               </motion.div>
+              )}
 
               {/* Quick Actions - Minimal & Clean.
                   Split into an outer positioning-only wrapper + an inner row
@@ -12311,6 +12365,7 @@ Provide only the answer, nothing else.`;
                   )}
                 </AnimatePresence>
                 {(() => {
+                  if (handbookViewer) return null;
                   const chipClass = `flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-medium border transition-all active:scale-95 duration-200 interaction-base interaction-press whitespace-nowrap shrink-0 ${quickActionClass}`;
                   const answerChipClass = (recording: boolean) =>
                     `flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-medium transition-all active:scale-95 duration-200 interaction-base interaction-press min-w-[74px] whitespace-nowrap shrink-0 ${
@@ -12853,36 +12908,86 @@ Provide only the answer, nothing else.`;
                           <div className="my-1 border-t border-border-muted/50" />
 
                           <div className="px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-text-tertiary">
-                            Official Handbooks
+                            Official Handbooks & Dossier
                           </div>
 
-                          <button
-                            onClick={() => void handleOpenHandbook('sde')}
-                            className="flex items-center justify-between w-full rounded-lg px-2.5 py-1.5 text-xs text-left transition-colors hover:bg-bg-item-hover text-text-primary"
-                          >
-                            <div className="flex items-center gap-2">
+                          <div className="flex items-center justify-between w-full rounded-lg px-2 py-1.5 text-xs text-left transition-colors hover:bg-bg-item-hover text-text-primary group">
+                            <button
+                              type="button"
+                              onClick={() => void handleOpenHandbook('sde')}
+                              className="flex items-center gap-2 flex-1 min-w-0 text-left cursor-pointer no-drag"
+                              title="View SDE Handbook in Assistant"
+                            >
                               <Code className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
-                              <div>
-                                <div className="font-medium">SDE Handbook (.md)</div>
-                                <div className="text-[10px] text-text-tertiary">W3Schools & GFG Q&A with Spoken Answers</div>
+                              <div className="min-w-0">
+                                <div className="font-medium truncate">SDE Handbook (.md)</div>
+                                <div className="text-[10px] text-text-tertiary truncate">W3Schools & GFG Q&A with Spoken Answers</div>
                               </div>
-                            </div>
-                            <ExternalLink className="w-3 h-3 text-text-tertiary shrink-0 ml-1" />
-                          </button>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                void handleOpenNativeHandbook('sde');
+                              }}
+                              className="p-1 rounded hover:bg-bg-secondary text-text-tertiary hover:text-cyan-300 transition-colors cursor-pointer shrink-0 ml-1.5 no-drag"
+                              title="Open on Desktop in system editor (VS Code, Notepad)"
+                            >
+                              <ExternalLink className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
 
-                          <button
-                            onClick={() => void handleOpenHandbook('aiml')}
-                            className="flex items-center justify-between w-full rounded-lg px-2.5 py-1.5 text-xs text-left transition-colors hover:bg-bg-item-hover text-text-primary mt-0.5"
-                          >
-                            <div className="flex items-center gap-2">
+                          <div className="flex items-center justify-between w-full rounded-lg px-2 py-1.5 text-xs text-left transition-colors hover:bg-bg-item-hover text-text-primary group mt-0.5">
+                            <button
+                              type="button"
+                              onClick={() => void handleOpenHandbook('aiml')}
+                              className="flex items-center gap-2 flex-1 min-w-0 text-left cursor-pointer no-drag"
+                              title="View AI/ML Handbook in Assistant"
+                            >
                               <Brain className="w-3.5 h-3.5 text-purple-400 shrink-0" />
-                              <div>
-                                <div className="font-medium">AI/ML Handbook (.md)</div>
-                                <div className="text-[10px] text-text-tertiary">PyTorch, ML, LLMs & GFG Q&A</div>
+                              <div className="min-w-0">
+                                <div className="font-medium truncate">AI/ML Handbook (.md)</div>
+                                <div className="text-[10px] text-text-tertiary truncate">PyTorch, ML, LLMs & GFG Q&A</div>
                               </div>
-                            </div>
-                            <ExternalLink className="w-3 h-3 text-text-tertiary shrink-0 ml-1" />
-                          </button>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                void handleOpenNativeHandbook('aiml');
+                              }}
+                              className="p-1 rounded hover:bg-bg-secondary text-text-tertiary hover:text-purple-300 transition-colors cursor-pointer shrink-0 ml-1.5 no-drag"
+                              title="Open on Desktop in system editor (VS Code, Notepad)"
+                            >
+                              <ExternalLink className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+
+                          <div className="flex items-center justify-between w-full rounded-lg px-2 py-1.5 text-xs text-left transition-colors hover:bg-bg-item-hover text-text-primary group mt-0.5">
+                            <button
+                              type="button"
+                              onClick={() => void handleOpenHandbook('candidate')}
+                              className="flex items-center gap-2 flex-1 min-w-0 text-left cursor-pointer no-drag"
+                              title="View Candidate Portfolio & Projects in Assistant"
+                            >
+                              <User className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                              <div className="min-w-0">
+                                <div className="font-medium truncate">Candidate Portfolio (.md)</div>
+                                <div className="text-[10px] text-text-tertiary truncate">Nishakar T - Threshold AI, Health Forecast, IoT</div>
+                              </div>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                void handleOpenNativeHandbook('candidate');
+                              }}
+                              className="p-1 rounded hover:bg-bg-secondary text-text-tertiary hover:text-emerald-300 transition-colors cursor-pointer shrink-0 ml-1.5 no-drag"
+                              title="Open on Desktop in system editor (VS Code, Notepad)"
+                            >
+                              <ExternalLink className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
 
                           {attachedModeFiles.length > 0 && (
                             <>
@@ -12892,16 +12997,35 @@ Provide only the answer, nothing else.`;
                               </div>
                               <div className="max-h-28 overflow-y-auto custom-scrollbar">
                                 {attachedModeFiles.map((file) => (
-                                  <button
+                                  <div
                                     key={file.id}
-                                    onClick={() => handleOpenAttachedFile(file)}
-                                    className="flex items-center justify-between w-full rounded-lg px-2.5 py-1 text-xs text-left transition-colors hover:bg-bg-item-hover text-text-primary"
+                                    className="flex items-center justify-between w-full rounded-lg px-2 py-1 text-xs text-left transition-colors hover:bg-bg-item-hover text-text-primary group"
                                   >
-                                    <div className="flex items-center gap-2 truncate">
+                                    <button
+                                      type="button"
+                                      onClick={() => handleOpenAttachedFile(file)}
+                                      className="flex items-center gap-2 truncate flex-1 text-left cursor-pointer no-drag"
+                                      title="View in Assistant"
+                                    >
                                       <FileText className="w-3.5 h-3.5 text-text-secondary shrink-0" />
                                       <span className="truncate">{file.fileName}</span>
-                                    </div>
-                                  </button>
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setShowFileMenu(false);
+                                        const api = (window as any).electronAPI;
+                                        if (api?.modesOpenReferenceFile) {
+                                          void api.modesOpenReferenceFile(file.id);
+                                        }
+                                      }}
+                                      className="p-1 rounded hover:bg-bg-secondary text-text-tertiary hover:text-accent-primary transition-colors cursor-pointer shrink-0 ml-1.5 no-drag"
+                                      title="Open on Desktop in system editor"
+                                    >
+                                      <ExternalLink className="w-3 h-3" />
+                                    </button>
+                                  </div>
                                 ))}
                               </div>
                             </>
@@ -12959,9 +13083,14 @@ Provide only the answer, nothing else.`;
                     {/* Official Technical Interview Handbooks Viewer */}
                     <div className="relative">
                       <button
+                        type="button"
                         onClick={() => void handleToggleHandbookViewer()}
-                        title={t('Official Technical Interview Handbooks (SDE & AI/ML)')}
-                        className="w-7 h-7 rounded-[9px] flex items-center justify-center interaction-base interaction-press overlay-bare-icon text-cyan-400 hover:text-cyan-300"
+                        title={handbookViewer ? t('Close Handbook Viewer (Esc)') : t('Official Technical Interview Handbooks (SDE & AI/ML)')}
+                        className={`w-7 h-7 rounded-[9px] flex items-center justify-center interaction-base interaction-press transition-colors cursor-pointer no-drag ${
+                          handbookViewer
+                            ? 'bg-cyan-500/25 text-cyan-300 ring-1 ring-cyan-400 shadow-sm'
+                            : 'overlay-bare-icon text-cyan-400 hover:text-cyan-300'
+                        }`}
                       >
                         <BookOpen className="w-3.5 h-3.5" />
                       </button>
@@ -13051,34 +13180,6 @@ Provide only the answer, nothing else.`;
           </motion.div>
       {/* end always-mounted shell */}
     </div>
-
-    {handbookViewer && (
-      <FileViewerModal
-        isOpen={handbookViewer.isOpen}
-        onClose={() => setHandbookViewer(null)}
-        title={handbookViewer.title}
-        fileName={handbookViewer.fileName}
-        content={handbookViewer.content}
-        filePath={handbookViewer.filePath}
-        fileId={handbookViewer.fileId}
-        bookId={handbookViewer.bookId}
-        availableBooks={handbookViewer.availableBooks}
-        onSelectBook={(selected) => {
-          setHandbookViewer((prev) =>
-            prev
-              ? {
-                  ...prev,
-                  title: selected.title,
-                  fileName: selected.fileName,
-                  content: selected.content,
-                  filePath: (selected as any).path || prev.filePath,
-                  bookId: selected.id,
-                }
-              : null
-          );
-        }}
-      />
-    )}
 
     {isAddCustomFileOpen && (
       <AddCustomFileModal

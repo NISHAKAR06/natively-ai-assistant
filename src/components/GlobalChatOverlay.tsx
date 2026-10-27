@@ -256,13 +256,19 @@ const GlobalChatOverlay: React.FC<GlobalChatOverlayProps> = ({
     // ESC key handler
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
-            if (e.key === 'Escape' && isOpen) {
-                onClose();
+            if (e.key === 'Escape') {
+                if (viewingFile) {
+                    setViewingFile(null);
+                    return;
+                }
+                if (isOpen) {
+                    onClose();
+                }
             }
         };
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [isOpen, onClose]);
+    }, [isOpen, onClose, viewingFile]);
 
     // Click outside handler
     const handleBackdropClick = useCallback((e: React.MouseEvent) => {

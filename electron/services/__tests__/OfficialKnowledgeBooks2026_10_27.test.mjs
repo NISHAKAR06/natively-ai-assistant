@@ -253,3 +253,23 @@ test('Interview Helper Persona, Candidate Introduction Grounding, and Anti-Hallu
   const policyContent = fs.readFileSync(policyPath, 'utf-8');
   assert.ok(policyContent.includes("profileSources: ['RESUME', 'PROFILE_FACT']"), 'General mode should include profileSources for candidate facts');
 });
+
+test('FileViewerModal Non-Intrusive Embedded Support, Escape Closes, and Desktop Launcher', () => {
+  const fileViewerPath = path.join(projectRoot, 'src', 'components', 'ui', 'FileViewerModal.tsx');
+  const fileViewerContent = fs.readFileSync(fileViewerPath, 'utf-8');
+
+  // Verify Escape key listener
+  assert.ok(fileViewerContent.includes("e.key === 'Escape'"), 'FileViewerModal should listen for Escape key');
+  assert.ok(fileViewerContent.includes("embedded = false"), 'FileViewerModal should support embedded property');
+  assert.ok(fileViewerContent.includes("Close (Esc)"), 'FileViewerModal should render prominent Close (Esc) button');
+  assert.ok(fileViewerContent.includes("handleOpenNative"), 'FileViewerModal should support opening in Desktop app');
+
+  // Verify NativelyInterface embeds FileViewerModal within shell card
+  const interfacePath = path.join(projectRoot, 'src', 'components', 'NativelyInterface.tsx');
+  const interfaceContent = fs.readFileSync(interfacePath, 'utf-8');
+
+  assert.ok(interfaceContent.includes('embedded={true}'), 'NativelyInterface should embed handbook viewer inside card with embedded={true}');
+  assert.ok(interfaceContent.includes('handleOpenNativeHandbook'), 'NativelyInterface should provide handleOpenNativeHandbook');
+  assert.ok(interfaceContent.includes('Open on Desktop in system editor'), 'NativelyInterface should provide direct desktop open triggers in file menu');
+  assert.ok(interfaceContent.includes('Close Handbook Viewer (Esc)'), 'NativelyInterface footer button should toggle closed when open');
+});

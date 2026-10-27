@@ -346,6 +346,11 @@ const Launcher: React.FC<LauncherProps> = ({ request, onStartMeeting, onOpenSett
     // Separate effect for keyboard listener — re-registers when isShortcutPressed changes
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
+            if (e.key === 'Escape' && viewingFile) {
+                e.preventDefault();
+                setViewingFile(null);
+                return;
+            }
             if (isShortcutPressed(e, 'toggleVisibility')) {
                 e.preventDefault();
                 window.electronAPI.toggleWindow();
@@ -367,7 +372,7 @@ const Launcher: React.FC<LauncherProps> = ({ request, onStartMeeting, onOpenSett
         return () => {
             window.removeEventListener('keydown', handleKeyDown);
         };
-    }, [isShortcutPressed]);
+    }, [isShortcutPressed, viewingFile]);
 
     // Declared above the `!window.electronAPI` early return below — a hook after
     // that guard would break the rules of hooks on the error path.
