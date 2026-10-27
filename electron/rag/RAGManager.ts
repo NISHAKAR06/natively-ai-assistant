@@ -396,6 +396,225 @@ export class RAGManager {
         }
     }
 
+    // --- Conversational Referent & Technical Topic Resolution Helpers ---
+    private static readonly TECHNICAL_DOMAIN_KEYWORDS: Array<{ domain: string; regex: RegExp; defaultExpansion: string }> = [
+        {
+            domain: 'SDLC',
+            regex: /\b(sdlc|software development life cycle|waterfall|agile|scrum|kanban|spiral model|v[- ]?model)\b/i,
+            defaultExpansion: 'SDLC models (Software Development Life Cycle: Waterfall, Agile, Scrum, Kanban, Lean, Spiral)'
+        },
+        {
+            domain: 'Database & SQL',
+            regex: /\b(sql|dbms|rdbms|postgresql|mysql|mongodb|redis|database|indexing|b-?tree|sharding|replication|acid|transactions?|normalization)\b/i,
+            defaultExpansion: 'Databases & SQL'
+        },
+        {
+            domain: 'System Design',
+            regex: /\b(system design|microservices?|monolith|load balancing|caching|message queues?|kafka|rabbitmq|pub\/?sub|rest api|graphql|grpc)\b/i,
+            defaultExpansion: 'System Design & Architecture'
+        },
+        {
+            domain: 'Data Structures & Algorithms',
+            regex: /\b(dsa|data structures?|algorithms?|binary search|sorting|linked list|trees?|graphs?|dynamic programming|recursion|time complexity|big[- ]?o)\b/i,
+            defaultExpansion: 'Data Structures & Algorithms'
+        },
+        {
+            domain: 'AI & Machine Learning',
+            regex: /\b(ai|machine learning|deep learning|neural networks?|llm|large language models?|rag|transformers?|embeddings?|prompt engineering|fine[- ]tuning)\b/i,
+            defaultExpansion: 'AI & Machine Learning'
+        },
+        {
+            domain: 'DevOps & Cloud',
+            regex: /\b(devops|docker|kubernetes|k8s|ci\/cd|jenkins|terraform|aws|gcp|azure|containers?)\b/i,
+            defaultExpansion: 'DevOps, CI/CD & Cloud Infrastructure'
+        },
+        {
+            domain: 'Object-Oriented & Design Patterns',
+            regex: /\b(oop|solid principles?|design patterns?|singleton|factory|observer|dependency injection)\b/i,
+            defaultExpansion: 'Software Design Patterns & SOLID Principles'
+        }
+    ];
+
+    private static isFollowUpQuery(query: string): boolean {
+        const norm = query.trim().toLowerCase().replace(/[?!.,]/g, '');
+        if (/^(?:can you\s+)?(?:please\s+)?(?:explain|describe|tell me about|walk me through|detail|expand on|compare|contrast|give|show|provide)?\s*(?:each|all|both|the|these|those|every|an?|more)?\s*(?:of\s+)?(?:model|models|phase|phases|step|steps|approach|approaches|type|types|method|methods|algorithm|algorithms|pattern|patterns|example|examples|one|ones|them|these|those)\b/i.test(norm)) {
+            return true;
+        }
+        if (/^(?:give\s+)?examples?\s*(?:also|too|as well|for each|for them)?$|^(?:compare|contrast)\s*(?:them|both|these|all)?$|^which\s+(?:one\s+)?is\s+(?:better|best)|^what\s+about\s+|^how\s+do\s+they\s+work|^how\s+does\s+it\s+work|^why(?:\s+so|\s+is\s+that)?$/i.test(norm)) {
+            return true;
+        }
+        const words = norm.split(/\s+/);
+        if (words.length <= 4 && words.some(w => ['each', 'them', 'these', 'those', 'models', 'phases', 'steps', 'types', 'methods', 'approaches', 'examples', 'also', 'difference'].includes(w))) {
+            return true;
+        }
+        return false;
+    }
+
+    private static parseRecentTurns(
+        historyText?: string,
+        sessionHistory?: Array<{ role: string; text: string }>
+    ): Array<{ role: 'user' | 'assistant'; text: string }> {
+        const turns: Array<{ role: 'user' | 'assistant'; text: string }> = [];
+        if (sessionHistory && sessionHistory.length > 0) {
+            for (const t of sessionHistory) {
+                turns.push({ role: t.role as 'user' | 'assistant', text: t.text });
+            }
+        }
+        if (historyText) {
+            const lines = historyText.split('\n');
+            let currentRole: 'user' | 'assistant' | null = null;
+            let currentLines: string[] = [];
+            for (const line of lines) {
+                const userM = line.match(/^User:\s*(.*)$/i);
+                const asstM = line.match(/^Assistant:\s*(.*)$/i);
+                if (userM) {
+                    if (currentRole && currentLines.length > 0) {
+                        turns.push({ role: currentRole, text: currentLines.join('\n').trim() });
+                    }
+                    currentRole = 'user';
+                    currentLines = [userM[1]];
+                } else if (asstM) {
+                    if (currentRole && currentLines.length > 0) {
+                        turns.push({ role: currentRole, text: currentLines.join('\n').trim() });
+                    }
+                    currentRole = 'assistant';
+                    currentLines = [asstM[1]];
+                } else if (currentRole) {
+                    currentLines.push(line);
+                }
+            }
+            if (currentRole && currentLines.length > 0) {
+                turns.push({ role: currentRole, text: currentLines.join('\n').trim() });
+            }
+        }
+        return turns;
+    }
+
+    private static resolveConversationalContext(
+        query: string,
+        historyText?: string,
+        sessionHistory?: Array<{ role: string; text: string }>
+    ): {
+        resolvedQuery: string;
+        activeTopic?: string;
+        isFollowUp: boolean;
+        isGeneralTechnical: boolean;
+    } {
+        const turns = RAGManager.parseRecentTurns(historyText, sessionHistory);
+        const isFollowUp = RAGManager.isFollowUpQuery(query);
+        const norm = query.trim().toLowerCase().replace(/[?!.,]/g, '');
+
+        let directDomainMatch: typeof RAGManager.TECHNICAL_DOMAIN_KEYWORDS[0] | null = null;
+        for (const d of RAGManager.TECHNICAL_DOMAIN_KEYWORDS) {
+            if (d.regex.test(norm)) {
+                directDomainMatch = d;
+                break;
+            }
+        }
+
+        if (!isFollowUp) {
+            return {
+                resolvedQuery: query,
+                activeTopic: directDomainMatch ? directDomainMatch.domain : undefined,
+                isFollowUp: false,
+                isGeneralTechnical: !!directDomainMatch
+            };
+        }
+
+        let matchedDomain: typeof RAGManager.TECHNICAL_DOMAIN_KEYWORDS[0] | null = null;
+        let fallbackSubject: string | null = null;
+
+        for (let i = turns.length - 1; i >= 0; i--) {
+            const turn = turns[i];
+            for (const d of RAGManager.TECHNICAL_DOMAIN_KEYWORDS) {
+                if (d.regex.test(turn.text)) {
+                    matchedDomain = d;
+                    break;
+                }
+            }
+            if (matchedDomain) break;
+
+            if (!fallbackSubject && turn.role === 'user') {
+                const subMatch = turn.text.match(/(?:what (?:are|is)|explain|describe|tell me about)\s+(?:different\s+)?([a-z0-9_ -]+?)(?:\s+available|\s+in|\?|$)/i);
+                if (subMatch && subMatch[1] && subMatch[1].trim().length > 2) {
+                    fallbackSubject = subMatch[1].trim();
+                }
+            }
+        }
+
+        if (!matchedDomain && !fallbackSubject) {
+            return {
+                resolvedQuery: query,
+                activeTopic: undefined,
+                isFollowUp: true,
+                isGeneralTechnical: false
+            };
+        }
+
+        if (!matchedDomain && fallbackSubject) {
+            return {
+                resolvedQuery: `Explain ${fallbackSubject} with practical examples`,
+                activeTopic: fallbackSubject,
+                isFollowUp: true,
+                isGeneralTechnical: true
+            };
+        }
+
+        let activeTopic = matchedDomain!.defaultExpansion;
+        let resolvedQuery = query;
+
+        if (matchedDomain!.domain === 'SDLC') {
+            if (/model/i.test(norm)) {
+                activeTopic = 'SDLC Models (Waterfall, Agile, Scrum, Kanban, Lean, Spiral)';
+                resolvedQuery = 'Explain each SDLC model (Waterfall, Agile, Scrum, Kanban, Lean, Spiral) with simple examples';
+            } else if (/phase|step/i.test(norm)) {
+                activeTopic = 'SDLC Phases (Requirements, Design, Implementation, Testing, Deployment, Maintenance)';
+                resolvedQuery = 'Explain each phase of the Software Development Life Cycle (SDLC) with examples';
+            } else if (/example/i.test(norm)) {
+                activeTopic = 'SDLC Models and Examples';
+                resolvedQuery = 'Provide real-world examples of SDLC models (e.g. Agile/Scrum vs Waterfall)';
+            } else if (/compare|contrast|difference/i.test(norm)) {
+                activeTopic = 'Comparison of SDLC Models';
+                resolvedQuery = 'Compare the main SDLC models (Waterfall vs Agile vs Scrum vs Kanban)';
+            } else {
+                activeTopic = matchedDomain!.defaultExpansion;
+                resolvedQuery = `${query} regarding ${activeTopic}`;
+            }
+        } else if (matchedDomain!.domain === 'Database & SQL') {
+            if (/index/i.test(norm)) {
+                activeTopic = 'Database Index Types (B-Tree, Hash, GIN, GiST, BRIN)';
+                resolvedQuery = 'Explain each database index type (B-tree, Hash, GIN, GiST, BRIN) with practical examples';
+            } else if (/normalization|normal form/i.test(norm)) {
+                activeTopic = 'Database Normalization (1NF, 2NF, 3NF, BCNF)';
+                resolvedQuery = 'Explain database normalization forms (1NF, 2NF, 3NF, BCNF) with examples';
+            } else if (/join/i.test(norm)) {
+                activeTopic = 'SQL Joins (INNER, LEFT, RIGHT, FULL OUTER)';
+                resolvedQuery = 'Explain each SQL join type (INNER, LEFT, RIGHT, FULL OUTER) with examples';
+            } else {
+                resolvedQuery = `${query} regarding ${activeTopic}`;
+            }
+        } else if (matchedDomain!.domain === 'System Design') {
+            if (/caching|cache/i.test(norm)) {
+                activeTopic = 'Caching Strategies (Cache-Aside, Write-Through, Write-Behind, Refresh-Ahead)';
+                resolvedQuery = 'Explain each caching strategy with practical system design examples';
+            } else if (/load balanc/i.test(norm)) {
+                activeTopic = 'Load Balancing Algorithms (Round Robin, Least Connections, IP Hash)';
+                resolvedQuery = 'Explain load balancing algorithms with system design examples';
+            } else {
+                resolvedQuery = `${query} regarding ${activeTopic}`;
+            }
+        } else {
+            resolvedQuery = `${query} regarding ${activeTopic}`;
+        }
+
+        return {
+            resolvedQuery,
+            activeTopic,
+            isFollowUp: true,
+            isGeneralTechnical: true
+        };
+    }
+
     /**
      * Query across all meetings (global search)
      */
@@ -470,12 +689,24 @@ Generate a cohesive, highly articulate, confident first-person interview answer:
             }
         }
 
-        // 3. General Cross-Meeting, Profile Retrieval & Live Web Research (Tavily)
+        // 3. Conversational Context & Topic Resolution
+        const { resolvedQuery, activeTopic, isFollowUp, isGeneralTechnical } = RAGManager.resolveConversationalContext(
+            query,
+            conversationHistory,
+            this.sessionHistory
+        );
+
+        const isMeetingQuery = /\b(meeting|meetings|call|calls|sync|standup|discussion|discussions|action items?|we talked about|we discussed|in the transcript|transcript|meeting notes)\b/i.test(normalized);
+
+        // 4. General Cross-Meeting, Profile Retrieval & Live Web Research (Tavily)
         const [context, profileResult, webResearch] = await Promise.all([
-            this.retriever.retrieveGlobal(query, { queryEmbedRetryBudgetMs: 1500 }).catch(err => {
-                console.warn('[RAGManager] retrieveGlobal error (non-fatal):', err?.message || err);
-                return { chunks: [], formattedContext: '', totalTokens: 0, meetingIds: [], intent: 'open_question' as const };
-            }),
+            // Only search meeting chunks if this is specifically a meeting query or NOT a general technical concept
+            (!isGeneralTechnical || isMeetingQuery)
+                ? this.retriever.retrieveGlobal(resolvedQuery, { queryEmbedRetryBudgetMs: 1500 }).catch(err => {
+                    console.warn('[RAGManager] retrieveGlobal error (non-fatal):', err?.message || err);
+                    return { chunks: [], formattedContext: '', totalTokens: 0, meetingIds: [], intent: 'open_question' as const };
+                })
+                : Promise.resolve({ chunks: [], formattedContext: '', totalTokens: 0, meetingIds: [], intent: 'open_question' as const }),
             (async () => {
                 // Profile facts should ONLY be retrieved for questions specifically asking about the candidate
                 if (!isCandidateQuery) return null;
@@ -494,13 +725,13 @@ Generate a cohesive, highly articulate, confident first-person interview answer:
                 return null;
             })(),
             (async () => {
-                // For general technical or interview concept questions, query Tavily for real-world web research
+                // For general technical or interview concept questions, query Tavily with the resolved query for accurate web research
                 if (isCandidateQuery) return null;
                 try {
                     const { TavilySearchService } = require('../services/TavilySearchService');
                     const tavily = TavilySearchService.getInstance();
                     if (tavily.hasApiKey()) {
-                        return await tavily.searchForInterview(query, 2500);
+                        return await tavily.searchForInterview(resolvedQuery, 2500);
                     }
                 } catch (e: any) {
                     console.warn('[RAGManager] Tavily interview search error (non-fatal):', e?.message || e);
@@ -516,20 +747,33 @@ Generate a cohesive, highly articulate, confident first-person interview answer:
 
         let webContext = '';
         if (webResearch?.formattedResearch) {
-            webContext = webResearch.formattedResearch;
+            webContext = `VERIFIED LIVE WEB RESEARCH & CITATIONS:\n${webResearch.formattedResearch}`;
         }
 
-        // Filter out profile chunks from meeting search so meetings and profile never cross-contaminate
-        const cleanMeetingContext = context.chunks
-            .filter(c => {
-                const mid = (c.meetingId || '').toLowerCase();
-                const txt = (c.text || '').toLowerCase();
-                if (mid.startsWith('profile-') || mid.includes('resume') || mid.includes('cv') || mid.includes('jd')) return false;
-                if (txt.includes('achievements & certifications') || txt.includes('b.tech in artificial intelligence') || txt.includes('software professional · key experience') || txt.includes('candidate name:') || txt.includes('page 1')) return false;
-                return true;
-            })
-            .map(c => c.text)
-            .join('\n\n');
+        // Active interview mode guidance and reference files (e.g. SDE interview or AI/ML interview)
+        let activeModeContext = '';
+        try {
+            const { ModesManager } = require('../services/ModesManager');
+            const modesMgr = ModesManager.getInstance();
+            activeModeContext = modesMgr?.buildActiveModeContextBlock?.() || '';
+        } catch (e: any) {
+            /* ignore */
+        }
+
+        // Filter out profile chunks from meeting search so meetings and profile never cross-contaminate.
+        // For general technical questions, meeting notes are completely excluded to prevent project/topic contamination.
+        const cleanMeetingContext = (!isGeneralTechnical || isMeetingQuery)
+            ? context.chunks
+                .filter(c => {
+                    const mid = (c.meetingId || '').toLowerCase();
+                    const txt = (c.text || '').toLowerCase();
+                    if (mid.startsWith('profile-') || mid.includes('resume') || mid.includes('cv') || mid.includes('jd')) return false;
+                    if (txt.includes('achievements & certifications') || txt.includes('b.tech in artificial intelligence') || txt.includes('software professional · key experience') || txt.includes('candidate name:') || txt.includes('page 1')) return false;
+                    return true;
+                })
+                .map(c => c.text)
+                .join('\n\n')
+            : '';
 
         let formatted = '';
         const contextParts: string[] = [];
@@ -543,6 +787,7 @@ Generate a cohesive, highly articulate, confident first-person interview answer:
             contextParts.push(`RECENT SESSION CHAT HISTORY (Current Turn Context):\n${sessionHistoryText}`);
         }
         if (webContext) contextParts.push(webContext);
+        if (activeModeContext) contextParts.push(`ACTIVE INTERVIEW MODE GUIDANCE & REFERENCE FILES:\n${activeModeContext}`);
         if (profileContext) contextParts.push(profileContext);
         if (cleanMeetingContext) contextParts.push(`MEETING DISCUSSIONS & NOTES:\n${cleanMeetingContext}`);
 
@@ -554,10 +799,15 @@ Generate a cohesive, highly articulate, confident first-person interview answer:
 
         const systemPrompt = getRAGSystemPrompt('global', context.intent);
 
+        // Clarify topic in the user turn if this is an elliptical follow-up
+        const effectiveUserPrompt = (isFollowUp && activeTopic)
+            ? `${query}\n\n(Context clarification from recent chat: This is a follow-up regarding ${activeTopic}.)`
+            : query;
+
         // Stream response with explicit system prompt and context separation
         const streamOutcome: { incomplete?: boolean } = {};
         const stream = this.llmHelper.streamChatWithGemini(
-            query,
+            effectiveUserPrompt,
             undefined,
             formatted,
             false,

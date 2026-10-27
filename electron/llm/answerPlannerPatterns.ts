@@ -80,6 +80,10 @@ const SOFTWARE_ENGINEERING_CONCEPT_PATTERNS = [
   /\b(design patterns?|singletons?|factory patterns?|observer patterns?|solid principles?)\b/i,
   /\b(memory leaks?|load balanc\w*)\b/i,
   /\b(unit test\w*|\btdd\b|test[- ]?driven development|monorepos?)\b/i,
+  /\b(sdlc|software development life cycle|waterfall( model)?|agile( methodology| model| framework)?|scrum( framework)?|kanban|lean development|spiral model|v[- ]?model|rapid application development|rad)\b/i,
+  /\b(microservices?|monolith(ic)?|event[- ]driven architecture|message queues?|kafka|rabbitmq|pub\/?sub|rest(ful)? api|graphql|grpc|api gateway)\b/i,
+  /\b(rdbms|dbms|sql|nosql|database normalization|acid properties|database index(ing|es)?|b-?tree|sharding|replication|partitioning|cap theorem)\b/i,
+  /\b(explain (each|all|both|the) (model|phase|step|type|approach|method)s?)\b/i,
 ];
 
 export const PROGRAMMING_LANGUAGE_AND_TOOL_PATTERNS = [
@@ -712,11 +716,12 @@ export // Generic technical-concept questions ("explain BFS", "what is a deadloc
 // is no coding verb and no skill-experience framing.
 const TECHNICAL_CONCEPT_PATTERNS = [
   /\b(explain|what(?:'s| is| are)|describe|how does|how do|define|difference between|compare)\b/i,
+  /\b(explain|describe|detail|walk through)\s+(each|all|both|the|these|those)\s+(model|phase|step|type|approach|method|algorithm)s?\b/i,
   // "give me an example for/of a REST API / SQL query / recursion" — a CONCEPT
   // example request (real manual-chat log 2026-06-06b). A technical explanation,
   // NOT a behavioral story. The tech subject must follow the example phrasing.
-  /\b(give|show|share)\s+(me\s+)?(an?\s+)?(example|demo|sample|illustration|snippet)\b\s*(of|for|with|using)?\s*(a |an |the )?(rest|api|sql|graphql|recursion|binary|hash|loop|function|query|algorithm|regex|json|http|crud|endpoint|database|schema|closure|promise|async|middleware)\b/i,
-  /\b(example|demo|sample) (of|for) (a |an |the )?(rest|api|sql|graphql|recursion|hashmap|linked list|binary search)\b/i,
+  /\b(give|show|share)\s+(me\s+)?(an?\s+)?(example|demo|sample|illustration|snippet)\b\s*(of|for|with|using)?\s*(a |an |the )?(rest|api|sql|graphql|recursion|binary|hash|loop|function|query|algorithm|regex|json|http|crud|endpoint|database|schema|closure|promise|async|middleware|sdlc|model|agile|waterfall)\b/i,
+  /\b(example|demo|sample) (of|for) (a |an |the )?(rest|api|sql|graphql|recursion|hashmap|linked list|binary search|sdlc|model)\b/i,
 ];
 
 export // Phase 2: HYPOTHETICAL technical application — "how would you use X", "how would
