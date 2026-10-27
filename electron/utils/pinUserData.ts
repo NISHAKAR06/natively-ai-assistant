@@ -27,11 +27,13 @@ import fs from 'node:fs';
 import path from 'path';
 import { runProfileMigration } from './migrateUserData';
 
-if (app.isPackaged) {
+const electronApp = app || (typeof require !== 'undefined' ? (require('electron')?.app || require('electron')) : undefined);
+
+if (electronApp?.isPackaged) {
   const { dir } = runProfileMigration({
     platform: process.platform,
     isPackaged: true,
-    appDataDir: app.getPath('appData'),
+    appDataDir: electronApp.getPath('appData'),
     join: path.join,
     fs: {
       existsSync: (p) => fs.existsSync(p),
@@ -42,6 +44,6 @@ if (app.isPackaged) {
     },
   });
   if (dir) {
-    app.setPath('userData', dir);
+    electronApp.setPath('userData', dir);
   }
 }

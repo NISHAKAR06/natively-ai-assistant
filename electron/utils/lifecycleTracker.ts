@@ -210,6 +210,7 @@ export class LifecycleTracker {
     };
 
     process.on('uncaughtException', (err) => {
+      console.error('[Lifecycle] uncaughtException detail:', err);
       // Don't intercept the nativeArch dialog handler — main.ts and
       // nativeArchGate.ts have their own uncaughtException for the
       // [nativeArch] prefix path. We log and tag, but don't prevent
