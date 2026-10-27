@@ -10145,7 +10145,13 @@ let isMultimodal = !!(imagePaths?.length);
           const { TavilySearchService } = require('./services/TavilySearchService');
           const tavily = TavilySearchService.getInstance();
           if (tavily.hasApiKey()) {
-            const tavilyRes = await tavily.searchForInterview(message, 2500);
+            let role: string | undefined;
+            try {
+              const { ModesManager } = require('./services/ModesManager');
+              const activeMode = ModesManager.getInstance().getActiveMode();
+              role = activeMode?.templateType?.includes('aiml') ? 'aiml' : activeMode?.templateType?.includes('sde') ? 'sde' : undefined;
+            } catch { /* ignore */ }
+            const tavilyRes = await tavily.searchForInterview(message, 2500, role);
             if (tavilyRes?.formattedResearch) {
               context = context ? `${tavilyRes.formattedResearch}\n\n${context}` : tavilyRes.formattedResearch;
             }

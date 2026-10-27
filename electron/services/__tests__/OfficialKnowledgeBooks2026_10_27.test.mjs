@@ -273,3 +273,105 @@ test('FileViewerModal Non-Intrusive Embedded Support, Escape Closes, and Desktop
   assert.ok(interfaceContent.includes('Open on Desktop in system editor'), 'NativelyInterface should provide direct desktop open triggers in file menu');
   assert.ok(interfaceContent.includes('Close Handbook Viewer (Esc)'), 'NativelyInterface footer button should toggle closed when open');
 });
+
+test('Strict Official Documentation Routing, PyTorch.org Prioritization, GFG, Wikipedia, and Known Knowledge Synthesis', () => {
+  const tavilyPath = path.join(projectRoot, 'electron', 'services', 'TavilySearchService.ts');
+  const tavilyContent = fs.readFileSync(tavilyPath, 'utf-8');
+
+  // 1. Verify TavilySearchService constants & helpers
+  assert.ok(tavilyContent.includes('BASE_AUTHORITATIVE_DOMAINS'), 'TavilySearchService should define BASE_AUTHORITATIVE_DOMAINS');
+  assert.ok(tavilyContent.includes('TECHNOLOGY_OFFICIAL_DOMAINS_MAP'), 'TavilySearchService should define TECHNOLOGY_OFFICIAL_DOMAINS_MAP');
+  assert.ok(tavilyContent.includes('resolveOfficialDomainsForQuery'), 'TavilySearchService should export resolveOfficialDomainsForQuery');
+  assert.ok(tavilyContent.includes('pytorch.org'), 'Should map PyTorch to pytorch.org');
+  assert.ok(tavilyContent.includes('geeksforgeeks.org'), 'Authoritative domains should include geeksforgeeks.org');
+  assert.ok(tavilyContent.includes('en.wikipedia.org'), 'Authoritative domains should include en.wikipedia.org');
+  assert.ok(tavilyContent.includes('w3schools.com'), 'Authoritative domains should include w3schools.com');
+
+  // 2. Test domain resolution behavior via dynamic execution
+  // We can write a quick inline test of the regex/mapping logic
+  const pytorchMatch = tavilyContent.includes("'pytorch': ['pytorch.org', 'docs.pytorch.org']");
+  assert.ok(pytorchMatch, "PyTorch must map strictly to ['pytorch.org', 'docs.pytorch.org']");
+
+  // 3. Verify WhatToAnswerLLM enforces official documentation and candidate known knowledge
+  const wtaPath = path.join(projectRoot, 'electron', 'llm', 'WhatToAnswerLLM.ts');
+  const wtaContent = fs.readFileSync(wtaPath, 'utf-8');
+
+  assert.ok(wtaContent.includes('CANDIDATE_KNOWN_KNOWLEDGE_SUMMARY'), 'WhatToAnswerLLM should maintain CANDIDATE_KNOWN_KNOWLEDGE_SUMMARY');
+  assert.ok(wtaContent.includes('Nishakar T'), 'Candidate known knowledge must reference Nishakar T');
+  assert.ok(wtaContent.includes('8th Node (FeedbackStateNode)'), 'Candidate known knowledge must explain 8th Node');
+  assert.ok(wtaContent.includes('~11% positive class imbalance'), 'Candidate known knowledge must specify 11% class imbalance');
+  assert.ok(wtaContent.includes('OFFICIAL DOCUMENTATION & REFERENCE SOURCING MANDATE'), 'WhatToAnswerLLM must have OFFICIAL DOCUMENTATION & REFERENCE SOURCING MANDATE');
+  assert.ok(wtaContent.includes('pytorch.org for PyTorch'), 'Mandate must cite pytorch.org for PyTorch');
+  assert.ok(wtaContent.includes('GeeksforGeeks, Wikipedia, W3Schools'), 'Mandate must reference GFG, Wikipedia, and W3Schools');
+
+  // 4. Verify RAG Prompts
+  const promptsPath = path.join(projectRoot, 'electron', 'rag', 'prompts.ts');
+  const promptsContent = fs.readFileSync(promptsPath, 'utf-8');
+  assert.ok(promptsContent.includes('OFFICIAL DOCUMENTATION & AUTHORITATIVE SOURCING INVARIANT'), 'GLOBAL_RAG_SYSTEM_PROMPT must have OFFICIAL DOCUMENTATION & AUTHORITATIVE SOURCING INVARIANT');
+  assert.ok(promptsContent.includes('pytorch.org for PyTorch'), 'GLOBAL_RAG_SYSTEM_PROMPT must cite pytorch.org for PyTorch');
+  assert.ok(promptsContent.includes('GeeksforGeeks, Wikipedia, W3Schools'), 'GLOBAL_RAG_SYSTEM_PROMPT must cite GFG, Wikipedia, and W3Schools');
+  assert.ok(promptsContent.includes('candidate Nishakar T\'s known technical knowledge'), 'GLOBAL_RAG_SYSTEM_PROMPT must synthesize candidate known knowledge');
+});
+
+test('resolveOfficialDomainsForQuery dynamically routes to official technology doc sites, GFG, Wikipedia, and W3Schools', async () => {
+  const distTavilyPath = path.join(projectRoot, 'dist-electron', 'electron', 'services', 'TavilySearchService.js');
+  assert.ok(fs.existsSync(distTavilyPath), 'Compiled TavilySearchService.js must exist');
+
+  const { resolveOfficialDomainsForQuery } = await import(`file://${distTavilyPath.replace(/\\/g, '/')}`);
+  assert.equal(typeof resolveOfficialDomainsForQuery, 'function', 'resolveOfficialDomainsForQuery must be a function');
+
+  // 1. PyTorch query: must route to pytorch.org as primary and include GFG, Wikipedia, W3Schools
+  const pytorchRes = resolveOfficialDomainsForQuery('explain pytorch tensors and autograd');
+  assert.equal(pytorchRes.detectedTech, 'pytorch');
+  assert.equal(pytorchRes.primaryOfficialDomain, 'pytorch.org');
+  assert.ok(pytorchRes.targetDomains.includes('pytorch.org'), 'Must include pytorch.org');
+  assert.ok(pytorchRes.targetDomains.includes('docs.pytorch.org'), 'Must include docs.pytorch.org');
+  assert.ok(pytorchRes.targetDomains.includes('geeksforgeeks.org'), 'Must include geeksforgeeks.org');
+  assert.ok(pytorchRes.targetDomains.includes('en.wikipedia.org'), 'Must include en.wikipedia.org');
+  assert.ok(pytorchRes.targetDomains.includes('w3schools.com'), 'Must include w3schools.com');
+  assert.equal(pytorchRes.targetDomains[0], 'pytorch.org', 'pytorch.org must be the very first domain prioritized');
+
+  // 2. Scikit-learn query: must route to scikit-learn.org
+  const sklearnRes = resolveOfficialDomainsForQuery('how does scikit-learn handle polynomial regression');
+  assert.equal(sklearnRes.detectedTech, 'scikit-learn');
+  assert.equal(sklearnRes.primaryOfficialDomain, 'scikit-learn.org');
+  assert.ok(sklearnRes.targetDomains.includes('scikit-learn.org'));
+  assert.ok(sklearnRes.targetDomains.includes('geeksforgeeks.org'));
+  assert.ok(sklearnRes.targetDomains.includes('en.wikipedia.org'));
+  assert.ok(sklearnRes.targetDomains.includes('w3schools.com'));
+
+  // 3. React query: must route to react.dev
+  const reactRes = resolveOfficialDomainsForQuery('what are react hooks and useMemo');
+  assert.equal(reactRes.detectedTech, 'react');
+  assert.equal(reactRes.primaryOfficialDomain, 'react.dev');
+  assert.ok(reactRes.targetDomains.includes('react.dev'));
+  assert.ok(reactRes.targetDomains.includes('geeksforgeeks.org'));
+  assert.ok(reactRes.targetDomains.includes('en.wikipedia.org'));
+
+  // 4. PostgreSQL query: must route to postgresql.org
+  const pgRes = resolveOfficialDomainsForQuery('explain postgresql b-tree indexes');
+  assert.equal(pgRes.detectedTech, 'postgresql');
+  assert.equal(pgRes.primaryOfficialDomain, 'postgresql.org');
+  assert.ok(pgRes.targetDomains.includes('postgresql.org'));
+  assert.ok(pgRes.targetDomains.includes('geeksforgeeks.org'));
+
+  // 5. Docker query: must route to docs.docker.com
+  const dockerRes = resolveOfficialDomainsForQuery('what is docker container isolation');
+  assert.equal(dockerRes.detectedTech, 'docker');
+  assert.equal(dockerRes.primaryOfficialDomain, 'docs.docker.com');
+  assert.ok(dockerRes.targetDomains.includes('docs.docker.com'));
+
+  // 6. Role-based fallback queries (no specific technology mentioned)
+  const aimlRoleRes = resolveOfficialDomainsForQuery('explain bias variance tradeoff', 'aiml');
+  assert.ok(aimlRoleRes.targetDomains.includes('geeksforgeeks.org'));
+  assert.ok(aimlRoleRes.targetDomains.includes('en.wikipedia.org'));
+  assert.ok(aimlRoleRes.targetDomains.includes('w3schools.com'));
+  assert.ok(aimlRoleRes.targetDomains.includes('scikit-learn.org'));
+  assert.ok(aimlRoleRes.targetDomains.includes('pytorch.org'));
+
+  const sdeRoleRes = resolveOfficialDomainsForQuery('what is abstraction in oop', 'sde');
+  assert.ok(sdeRoleRes.targetDomains.includes('geeksforgeeks.org'));
+  assert.ok(sdeRoleRes.targetDomains.includes('en.wikipedia.org'));
+  assert.ok(sdeRoleRes.targetDomains.includes('w3schools.com'));
+  assert.ok(sdeRoleRes.targetDomains.includes('developer.mozilla.org'));
+});

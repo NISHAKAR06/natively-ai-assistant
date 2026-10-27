@@ -1256,6 +1256,17 @@ The user triggered this action with a coding problem on screen and NO new questi
             const resolvedQuestionText = (answerPlan?.question || '').trim();
             const isCandidateSelfQuery = /(tell (me |us )?about (your ?self|my ?self|you)|tell (me |us )?about (my |your )?(experience|background|projects?|work|career|profile)|(give|state|share) (me |us )?(a |an |your )?(quick |brief |short )?(intro|introduction|overview|background|profile)|introduce (your ?self|urself|you)|who (are you|are u|r u|am i)|walk (me |us )?through (your |my )?(resume|background|cv|projects?|work|profile)|what is (my|your) (experience|background|role|stack)|what are (my|your) (skills|strengths|projects)|what projects have (you|i) (worked on|done|built)|why should we hire you|describe your ?self|talk about your ?self|my projects?|your projects?|my resume|your resume|my experience|your experience|my background|your background|health forecast|threshold|readmission|re-admission|8th node|state machine|governance|intel unnati|solidworks|floatchat|github|what('?s| is) (your|my) current role|what are you working on|quick overview of (your|my) (actual )?(background|projects?|work)|class imbalance|resampling|classmates)/i.test(resolvedQuestionText);
 
+            // Always ground the LLM in candidate's known knowledge & technical dossier facts
+            const CANDIDATE_KNOWN_KNOWLEDGE_SUMMARY = `## CANDIDATE KNOWN KNOWLEDGE & PROFILE (Nishakar T):
+- Identity & Education: Nishakar T, B.Tech Artificial Intelligence & Machine Learning at Sri Shakthi Institute of Engineering and Technology (CGPA: 8.08 / 10).
+- Core Projects & Architecture:
+  * Threshold AI Governance Platform: 8-node state machine with graduated autonomy; Node 8 (FeedbackStateNode) is the closed-loop learning node adjusting Bayesian risk scoring from human review actions.
+  * Health Forecast AI (MediQuery AI): 30-day hospital readmission model with ~11% positive class imbalance handled via SMOTE on training folds, class-weighted Random Forest & XGBoost (class_weight='balanced', penalizing false negatives), PR-AUC and F2-score evaluation, and probability threshold tuned to ~0.32.
+  * Intel Unnati IoT Digital Twin: FastAPI backend, WebSockets streaming, Isolation Forest for sensor anomaly detection, XGBoost Regressor for Remaining Useful Life (RUL) estimation.
+  * SolidWorks Parts Counter: PyTorch CNN on 10,000+ images with 96.53% accuracy.
+- Core Knowledge Handbooks: SDE Interview Official Handbook, AIML Interview Official Handbook.`;
+            _wtaSystemPrompt = `${_wtaSystemPrompt}\n\n${CANDIDATE_KNOWN_KNOWLEDGE_SUMMARY}`;
+
             let candidateDossierBlock = '';
             if (isCandidateSelfQuery) {
                 const portfolio = getCandidatePortfolioContent();
@@ -1273,16 +1284,17 @@ Ground the response directly and specifically in the technical facts from the do
                 }
             }
 
-            const isTechnicalOrConceptual = !isCandidateSelfQuery && (
-                answerPlan?.answerType === 'technical_concept_answer' ||
-                answerPlan?.answerType === 'general_meeting_answer' ||
-                (!candidateProfile && resolvedQuestionText.length > 5)
-            );
-
             const activeModeId = (requestSnapshot?.modeUniqueId || '').toLowerCase();
             const isSde = activeModeId.includes('sde') || activeSkill?.id?.toLowerCase().includes('sde');
             const isAiml = activeModeId.includes('aiml') || activeSkill?.id?.toLowerCase().includes('aiml');
             const interviewRole = isAiml ? 'aiml' : isSde ? 'sde' : undefined;
+
+            const isTechnicalOrConceptual = (
+                answerPlan?.answerType === 'technical_concept_answer' ||
+                answerPlan?.answerType === 'general_meeting_answer' ||
+                (!candidateProfile && resolvedQuestionText.length > 5) ||
+                !isCandidateSelfQuery
+            );
 
             let webResearchBlock = '';
             if (isTechnicalOrConceptual && resolvedQuestionText) {
@@ -1300,9 +1312,11 @@ Ground the response directly and specifically in the technical facts from the do
                 }
             }
 
-            // If candidate dossier or web research was fetched, update user message
+            // If candidate dossier and/or web research was fetched, update user message cleanly
             let _effectiveUserMessage = _wtaUserMessage;
-            if (candidateDossierBlock) {
+            if (candidateDossierBlock && webResearchBlock) {
+                _effectiveUserMessage = `${webResearchBlock}\n\n[CANDIDATE DOSSIER GROUNDING AVAILABLE - ANSWER DIRECTLY AS NISHAKAR]\n${_wtaUserMessage}`;
+            } else if (candidateDossierBlock) {
                 _effectiveUserMessage = `[CANDIDATE DOSSIER GROUNDING AVAILABLE - ANSWER DIRECTLY AS NISHAKAR]\n${_effectiveUserMessage}`;
             } else if (webResearchBlock) {
                 _effectiveUserMessage = `${webResearchBlock}\n\n${_wtaUserMessage}`;
@@ -1312,7 +1326,7 @@ Ground the response directly and specifically in the technical facts from the do
             if (isTechnicalOrConceptual) {
                 _wtaSystemPrompt = `${_wtaSystemPrompt}\n\n## RESPONSE STRUCTURE FOR TECHNICAL CONCEPT QUESTIONS:
 When explaining a technical concept, language, framework, database, AI/ML topic, or system design in an interview:
-1. Core Explanation: Start immediately with a clear, authoritative explanation in 2-3 spoken sentences. If web research sources are provided above, cite source URLs inline as markdown citation links: [[1](url), [2](url)].
+1. Core Explanation: Start immediately with a clear, authoritative explanation in 2-3 spoken sentences. Base strictly on official documentation (e.g. pytorch.org for PyTorch, react.dev for React, docs.python.org for Python) and authoritative sources (GeeksforGeeks, Wikipedia, W3Schools). If web research sources are provided above, cite source URLs inline as markdown citation links: [[1](url), [2](url)].
 2. Simple Example: Include a section titled "Simple Example" with:
    - Scenario starting with "Imagine you..."
    - "How it works:": Brief, clear intuition of what happens behind the scenes.
@@ -1322,16 +1336,15 @@ When explaining a technical concept, language, framework, database, AI/ML topic,
 3. Key Concepts: Include a section titled "Key Concepts" listing 2-4 core terms with concise 1-sentence explanations and citations.`;
             }
 
-            if (interviewRole) {
-                _wtaSystemPrompt = `${_wtaSystemPrompt}\n\n## OFFICIAL DOCUMENTATION GROUNDING MANDATE (${interviewRole === 'aiml' ? 'AI/ML' : 'SDE'} ROLE):
-The candidate is actively interviewing for an ${interviewRole === 'aiml' ? 'Artificial Intelligence / Machine Learning Engineer' : 'Software Development Engineer (SDE)'} position.
+            _wtaSystemPrompt = `${_wtaSystemPrompt}\n\n## OFFICIAL DOCUMENTATION & REFERENCE SOURCING MANDATE (${interviewRole === 'aiml' ? 'AI/ML' : interviewRole === 'sde' ? 'SDE' : 'TECHNICAL'} INTERVIEW):
 When the interviewer asks about a technical concept, pattern, tool, or algorithm:
-1. GROUND STRICTLY IN OFFICIAL PAGES: Base all technical explanations, definitions, and mechanics exclusively on verified official documentation (GeeksforGeeks, W3Schools, Python/PyTorch/MDN official docs) provided in the research block and knowledge handbooks. Do NOT hallucinate definitions.
-2. CONVERSATIONAL SPOKEN ENGLISH: Formulate the response in natural, humanized English that sounds authentic and smooth when the candidate reads or speaks it aloud to the interviewer. Avoid overly dense robotic jargon.
-3. DETAILED PRACTICAL EXAMPLE: Always include an intuitive real-world scenario illustrating how the concept operates in production.
-4. CODE WHEN APPLICABLE: If code, syntax, or SQL is relevant to the question, provide clean, idiomatic, runnable code snippets.
-5. CITATIONS: Cite the official source URL(s) inline with markdown links: [[1](url), [2](url)].`;
-            }
+1. GROUND STRICTLY IN OFFICIAL DOCUMENTATION: Base all technical explanations, definitions, and mechanics strictly on the technology's official website (e.g. pytorch.org for PyTorch, react.dev for React, docs.python.org for Python, scikit-learn.org for Scikit-learn, docs.docker.com for Docker, postgresql.org for PostgreSQL).
+2. AUTHORITATIVE REFERENCES: Reference verified educational resources (GeeksforGeeks, Wikipedia, W3Schools) provided in the research block and knowledge handbooks. Do NOT hallucinate definitions.
+3. SYNTHESIZE CANDIDATE KNOWN KNOWLEDGE: Combine official documentation with candidate Nishakar T's known technical background and portfolio projects (AI governance 8th node feedback state machine, hospital readmission class imbalance handling, IoT digital twins).
+4. CONVERSATIONAL SPOKEN ENGLISH: Formulate the response in natural, humanized English that sounds authentic and smooth when the candidate reads or speaks it aloud to the interviewer. Avoid overly dense robotic jargon.
+5. DETAILED PRACTICAL EXAMPLE: Always include an intuitive real-world scenario illustrating how the concept operates in production.
+6. CODE WHEN APPLICABLE: If code, syntax, or SQL is relevant to the question, provide clean, idiomatic, runnable code snippets.
+7. CITATIONS: Cite the official source URL(s) inline with markdown links: [[1](url), [2](url)].`;
 
             // Prefer the outcome-bearing API so a truncated answer can be kept
             // out of session history. Fourteen existing suites inject a test
