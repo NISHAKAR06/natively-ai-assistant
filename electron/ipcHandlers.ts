@@ -18456,14 +18456,32 @@ export function initializeIpcHandlers(appState: AppState): void {
 
   safeHandle('modes:set-active', async (_, id: string | null) => {
     try {
-      // Allow clearing (null) or setting general mode without pro; all other modes require pro
+      let modeIdToSet: string | null = id;
       if (id !== null) {
         const { ModesManager } = require('./services/ModesManager');
-        const targetMode = ModesManager.getInstance()
+        const modesMgr = ModesManager.getInstance();
+        let targetMode = modesMgr
           .getModes()
-          .find((m: any) => m.id === id);
-        if (targetMode && targetMode.templateType !== 'general' && !isProOrTrialActive()) {
+          .find((m: any) => m.id === id || m.templateType === id);
+
+        if (!targetMode) {
+          modesMgr.ensureSeeded();
+          targetMode = modesMgr.getModes().find((m: any) => m.id === id || m.templateType === id);
+        }
+
+        const isFreeInterviewMode = targetMode && (
+          targetMode.templateType === 'general' ||
+          targetMode.templateType === 'sde-interview' ||
+          targetMode.templateType === 'aiml-interview' ||
+          targetMode.templateType === 'technical-interview'
+        );
+
+        if (targetMode && !isFreeInterviewMode && !isProOrTrialActive()) {
           return { success: false, error: 'pro_required' };
+        }
+
+        if (targetMode) {
+          modeIdToSet = targetMode.id;
         }
       }
       const { ModesManager } = require('./services/ModesManager');

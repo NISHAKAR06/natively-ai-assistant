@@ -30,6 +30,8 @@ export const BUILTIN_MODE_LABELS = {
   'team-meet': 'Team Meet',
   'looking-for-work': 'Looking for work',
   'technical-interview': 'Technical Interview',
+  'sde-interview': 'SDE Interview',
+  'aiml-interview': 'AI/ML Interview',
   'lecture': 'Lecture',
   'seminar': 'Seminar',
   'call-center': 'Call Center',

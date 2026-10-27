@@ -375,3 +375,34 @@ test('resolveOfficialDomainsForQuery dynamically routes to official technology d
   assert.ok(sdeRoleRes.targetDomains.includes('w3schools.com'));
   assert.ok(sdeRoleRes.targetDomains.includes('developer.mozilla.org'));
 });
+
+test('Default Interview Roles (SDE, AI/ML, Tech, General) are seeded and UI provides non-clipped role selector', () => {
+  // 1. Verify ModesManager seeds default roles and handbooks
+  const modesMgrPath = path.join(projectRoot, 'electron', 'services', 'ModesManager.ts');
+  const modesMgrContent = fs.readFileSync(modesMgrPath, 'utf-8');
+  assert.ok(modesMgrContent.includes("templateType === 'sde-interview'"), 'ensureSeeded should check for sde-interview');
+  assert.ok(modesMgrContent.includes("templateType === 'aiml-interview'"), 'ensureSeeded should check for aiml-interview');
+  assert.ok(modesMgrContent.includes("templateType === 'technical-interview'"), 'ensureSeeded should check for technical-interview');
+  assert.ok(modesMgrContent.includes("this.ensureOfficialKnowledgeBooks()"), 'ensureSeeded should trigger ensureOfficialKnowledgeBooks');
+
+  // 2. Verify builtinModes.ts contains labels
+  const builtinPath = path.join(projectRoot, 'electron', 'services', 'builtinModes.ts');
+  const builtinContent = fs.readFileSync(builtinPath, 'utf-8');
+  assert.ok(builtinContent.includes("'sde-interview': 'SDE Interview'"), 'builtinModes should have SDE Interview label');
+  assert.ok(builtinContent.includes("'aiml-interview': 'AI/ML Interview'"), 'builtinModes should have AI/ML Interview label');
+
+  // 3. Verify ipcHandlers.ts allows setting active interview roles without pro restriction
+  const ipcPath = path.join(projectRoot, 'electron', 'ipcHandlers.ts');
+  const ipcContent = fs.readFileSync(ipcPath, 'utf-8');
+  assert.ok(ipcContent.includes("targetMode.templateType === 'sde-interview'"), 'modes:set-active should allow sde-interview');
+  assert.ok(ipcContent.includes("targetMode.templateType === 'aiml-interview'"), 'modes:set-active should allow aiml-interview');
+  assert.ok(ipcContent.includes("targetMode.templateType === 'technical-interview'"), 'modes:set-active should allow technical-interview');
+
+  // 4. Verify NativelyInterface provides SDE, AIML, Tech roles and prevents top clipping
+  const uiPath = path.join(projectRoot, 'src', 'components', 'NativelyInterface.tsx');
+  const uiContent = fs.readFileSync(uiPath, 'utf-8');
+  assert.ok(uiContent.includes("handleSelectRole('sde-interview')"), 'UI should have SDE role button');
+  assert.ok(uiContent.includes("handleSelectRole('aiml-interview')"), 'UI should have AIML role button');
+  assert.ok(uiContent.includes("handleSelectRole('technical-interview')"), 'UI should have Technical Interview role button');
+  assert.ok(uiContent.includes("minHeight: (showRoleSelector || showFileMenu) ? 380 : undefined"), 'UI shellRef must expand minHeight when role selector or file menu is open to prevent top clipping');
+});

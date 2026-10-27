@@ -499,12 +499,23 @@ export class ModesManager {
         return modes;
     }
 
-    // Seed the un-deletable General mode once at app init. Idempotent.
+    // Seed default modes once at app init (General, SDE, AI/ML, and Technical Interview). Idempotent.
     public ensureSeeded(): void {
-        const modes = DatabaseManager.getInstance().getModes().map(rowToMode);
+        const db = DatabaseManager.getInstance();
+        const modes = db.getModes().map(rowToMode);
         if (!modes.some(m => m.templateType === 'general')) {
             this.createMode({ name: 'General', templateType: 'general' });
         }
+        if (!modes.some(m => m.templateType === 'sde-interview')) {
+            this.createMode({ name: 'SDE Interview', templateType: 'sde-interview' });
+        }
+        if (!modes.some(m => m.templateType === 'aiml-interview')) {
+            this.createMode({ name: 'AI/ML Interview', templateType: 'aiml-interview' });
+        }
+        if (!modes.some(m => m.templateType === 'technical-interview')) {
+            this.createMode({ name: 'Technical Interview', templateType: 'technical-interview' });
+        }
+        this.ensureOfficialKnowledgeBooks();
     }
 
     public getActiveMode(): Mode | null {
@@ -757,8 +768,10 @@ export class ModesManager {
             const fs = require('fs');
             const path = require('path');
 
-            const sdeMode = modes.find(m => m.templateType === 'sde-interview');
-            const aimlMode = modes.find(m => m.templateType === 'aiml-interview');
+            const sdeMode = modes.find(m => m.templateType === 'sde-interview')
+                || this.createMode({ name: 'SDE Interview', templateType: 'sde-interview' });
+            const aimlMode = modes.find(m => m.templateType === 'aiml-interview')
+                || this.createMode({ name: 'AI/ML Interview', templateType: 'aiml-interview' });
             const generalMode = modes.find(m => m.templateType === 'general');
 
             const candidateCandidates = [

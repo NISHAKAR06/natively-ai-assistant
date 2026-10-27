@@ -27,6 +27,7 @@ import {
   FileText,
   ExternalLink,
   User,
+  Terminal,
 } from 'lucide-react';
 import { FileViewerModal } from './ui/FileViewerModal';
 import { AddCustomFileModal } from './ui/AddCustomFileModal';
@@ -11470,6 +11471,7 @@ Provide only the answer, nothing else.`;
                 // (below), and syntax highlighting is memoized on the code STRING +
                 // language so a width change re-wraps text without re-tokenizing.
                 width: shellWidth,
+                minHeight: (showRoleSelector || showFileMenu) ? 380 : undefined,
                 // contain: layout/style isolates this box's layout/style from the
                 // ancestor chain so the per-frame width reflow (and any content
                 // growth) does not dirty layout up to the document — the reflow is
@@ -12765,12 +12767,17 @@ Provide only the answer, nothing else.`;
                         {activeRoleTrack?.includes('sde') ? (
                           <>
                             <Code className="w-3.5 h-3.5 text-cyan-400" />
-                            <span>SDE Role</span>
+                            <span>Role: SDE</span>
                           </>
                         ) : activeRoleTrack?.includes('aiml') ? (
                           <>
                             <Brain className="w-3.5 h-3.5 text-purple-400" />
-                            <span>AI/ML Role</span>
+                            <span>Role: AI/ML</span>
+                          </>
+                        ) : activeRoleTrack?.includes('technical') ? (
+                          <>
+                            <Terminal className="w-3.5 h-3.5 text-amber-400" />
+                            <span>Role: Tech</span>
                           </>
                         ) : (
                           <>
@@ -12783,68 +12790,107 @@ Provide only the answer, nothing else.`;
 
                       {showRoleSelector && (
                         <div
-                          className="absolute bottom-full mb-1.5 left-0 z-[100] w-64 rounded-xl border border-border-muted bg-bg-elevated p-1.5 shadow-2xl backdrop-blur-md text-text-primary"
+                          className="absolute bottom-full mb-1.5 left-0 z-[100] w-72 max-h-[340px] overflow-y-auto rounded-xl border border-border-muted bg-bg-elevated p-2 shadow-2xl backdrop-blur-md text-text-primary no-drag custom-scrollbar"
                           onClick={(e) => e.stopPropagation()}
                         >
-                          <div className="px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-text-tertiary">
-                            Select Interview Role
+                          <div className="flex items-center justify-between px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-text-tertiary mb-1">
+                            <span>Select Interview Role</span>
+                            <span className="text-[9px] lowercase bg-bg-item-surface px-1.5 py-0.5 rounded text-accent-primary font-mono">default roles</span>
                           </div>
+
+                          {/* SDE Role */}
                           <button
                             onClick={() => handleSelectRole('sde-interview')}
-                            className={`flex items-center justify-between w-full rounded-lg px-2.5 py-1.5 text-xs text-left transition-colors ${
-                              activeRoleTrack?.includes('sde') ? 'bg-cyan-500/15 text-cyan-300 font-medium' : 'hover:bg-bg-item-hover text-text-primary'
+                            className={`flex items-center justify-between w-full rounded-lg px-2.5 py-2 text-xs text-left transition-colors ${
+                              activeRoleTrack?.includes('sde') ? 'bg-cyan-500/15 text-cyan-300 font-medium border border-cyan-500/30' : 'hover:bg-bg-item-hover text-text-primary'
                             }`}
                           >
-                            <div className="flex items-center gap-2">
-                              <Code className="w-3.5 h-3.5 text-cyan-400" />
+                            <div className="flex items-center gap-2.5">
+                              <div className="p-1.5 rounded-md bg-cyan-500/10 text-cyan-400 shrink-0">
+                                <Code className="w-4 h-4" />
+                              </div>
                               <div>
-                                <div className="font-medium">SDE Role</div>
-                                <div className="text-[10px] text-text-tertiary">DSA, System Design, GFG Q&A</div>
+                                <div className="font-semibold text-xs flex items-center gap-1.5">
+                                  <span>SDE Role</span>
+                                  <span className="text-[9px] px-1 py-0.2 rounded bg-cyan-500/20 text-cyan-300 font-normal">SDE / Core</span>
+                                </div>
+                                <div className="text-[10px] text-text-tertiary">DSA, System Design, GFG & W3Schools Q&A</div>
                               </div>
                             </div>
-                            {activeRoleTrack?.includes('sde') && <Check className="w-3.5 h-3.5 text-cyan-400" />}
+                            {activeRoleTrack?.includes('sde') && <Check className="w-4 h-4 text-cyan-400 shrink-0" />}
                           </button>
 
+                          {/* AI / ML Role */}
                           <button
                             onClick={() => handleSelectRole('aiml-interview')}
-                            className={`flex items-center justify-between w-full rounded-lg px-2.5 py-1.5 text-xs text-left transition-colors mt-0.5 ${
-                              activeRoleTrack?.includes('aiml') ? 'bg-purple-500/15 text-purple-300 font-medium' : 'hover:bg-bg-item-hover text-text-primary'
+                            className={`flex items-center justify-between w-full rounded-lg px-2.5 py-2 text-xs text-left transition-colors mt-1 ${
+                              activeRoleTrack?.includes('aiml') ? 'bg-purple-500/15 text-purple-300 font-medium border border-purple-500/30' : 'hover:bg-bg-item-hover text-text-primary'
                             }`}
                           >
-                            <div className="flex items-center gap-2">
-                              <Brain className="w-3.5 h-3.5 text-purple-400" />
+                            <div className="flex items-center gap-2.5">
+                              <div className="p-1.5 rounded-md bg-purple-500/10 text-purple-400 shrink-0">
+                                <Brain className="w-4 h-4" />
+                              </div>
                               <div>
-                                <div className="font-medium">AI / ML Role</div>
-                                <div className="text-[10px] text-text-tertiary">PyTorch, LLMs, GFG Q&A</div>
+                                <div className="font-semibold text-xs flex items-center gap-1.5">
+                                  <span>AI / ML Role</span>
+                                  <span className="text-[9px] px-1 py-0.2 rounded bg-purple-500/20 text-purple-300 font-normal">AI / ML</span>
+                                </div>
+                                <div className="text-[10px] text-text-tertiary">PyTorch, LLMs, Neural Nets, GFG Q&A</div>
                               </div>
                             </div>
-                            {activeRoleTrack?.includes('aiml') && <Check className="w-3.5 h-3.5 text-purple-400" />}
+                            {activeRoleTrack?.includes('aiml') && <Check className="w-4 h-4 text-purple-400 shrink-0" />}
                           </button>
 
+                          {/* Technical Interview */}
+                          <button
+                            onClick={() => handleSelectRole('technical-interview')}
+                            className={`flex items-center justify-between w-full rounded-lg px-2.5 py-2 text-xs text-left transition-colors mt-1 ${
+                              activeRoleTrack?.includes('technical') ? 'bg-amber-500/15 text-amber-300 font-medium border border-amber-500/30' : 'hover:bg-bg-item-hover text-text-primary'
+                            }`}
+                          >
+                            <div className="flex items-center gap-2.5">
+                              <div className="p-1.5 rounded-md bg-amber-500/10 text-amber-400 shrink-0">
+                                <Terminal className="w-4 h-4" />
+                              </div>
+                              <div>
+                                <div className="font-semibold text-xs flex items-center gap-1.5">
+                                  <span>Technical Interview</span>
+                                  <span className="text-[9px] px-1 py-0.2 rounded bg-amber-500/20 text-amber-300 font-normal">Tech</span>
+                                </div>
+                                <div className="text-[10px] text-text-tertiary">Algorithms, Systems & Architecture</div>
+                              </div>
+                            </div>
+                            {activeRoleTrack?.includes('technical') && <Check className="w-4 h-4 text-amber-400 shrink-0" />}
+                          </button>
+
+                          {/* General Mode */}
                           <button
                             onClick={() => handleSelectRole(null)}
-                            className={`flex items-center justify-between w-full rounded-lg px-2.5 py-1.5 text-xs text-left transition-colors mt-0.5 ${
-                              !activeRoleTrack || activeRoleTrack === 'general' ? 'bg-accent-primary/15 text-accent-primary font-medium' : 'hover:bg-bg-item-hover text-text-primary'
+                            className={`flex items-center justify-between w-full rounded-lg px-2.5 py-2 text-xs text-left transition-colors mt-1 ${
+                              !activeRoleTrack || activeRoleTrack === 'general' ? 'bg-accent-primary/15 text-accent-primary font-medium border border-accent-primary/30' : 'hover:bg-bg-item-hover text-text-primary'
                             }`}
                           >
-                            <div className="flex items-center gap-2">
-                              <Globe className="w-3.5 h-3.5 text-text-tertiary" />
+                            <div className="flex items-center gap-2.5">
+                              <div className="p-1.5 rounded-md bg-bg-item-surface text-text-tertiary shrink-0">
+                                <Globe className="w-4 h-4" />
+                              </div>
                               <div>
-                                <div className="font-medium">General Mode</div>
-                                <div className="text-[10px] text-text-tertiary">Standard interview & meetings</div>
+                                <div className="font-semibold text-xs">General Mode</div>
+                                <div className="text-[10px] text-text-tertiary">Standard interview & general meetings</div>
                               </div>
                             </div>
-                            {(!activeRoleTrack || activeRoleTrack === 'general') && <Check className="w-3.5 h-3.5 text-accent-primary" />}
+                            {(!activeRoleTrack || activeRoleTrack === 'general') && <Check className="w-4 h-4 text-accent-primary shrink-0" />}
                           </button>
 
-                          <div className="my-1 border-t border-border-muted/50" />
+                          <div className="my-1.5 border-t border-border-muted/50" />
 
                           <button
                             onClick={() => {
                               setShowRoleSelector(false);
                               setIsAddCustomFileOpen(true);
                             }}
-                            className="flex items-center gap-2 w-full rounded-lg px-2.5 py-1.5 text-xs text-accent-primary hover:bg-accent-primary/10 transition-colors"
+                            className="flex items-center gap-2 w-full rounded-lg px-2.5 py-2 text-xs text-accent-primary hover:bg-accent-primary/10 transition-colors"
                           >
                             <Plus className="w-3.5 h-3.5" />
                             <span>Add Custom File or MD Note...</span>
