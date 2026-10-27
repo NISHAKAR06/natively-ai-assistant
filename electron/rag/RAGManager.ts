@@ -630,7 +630,7 @@ export class RAGManager {
         const normalized = query.trim().toLowerCase().replace(/[?!.,]/g, '');
 
         // 1. Assistant Identity & Greetings: Fast, accurate answer directly as Natively
-        const isAssistantIdentity = /^(who are (you|u)|what are you|what is natively|what is this app|who created you|who made you|what can you do|how can you help( me)?|help)$/i.test(normalized);
+        const isAssistantIdentity = /^(what is natively|what is this app|who created you|who made you|what can you do|how can you help( me)?|help)$/i.test(normalized);
         const isGreeting = /^(hi|hello|hey|good (morning|afternoon|evening)|howdy|greetings|sup)$/i.test(normalized);
 
         if (isAssistantIdentity) {
@@ -650,21 +650,29 @@ export class RAGManager {
         }
 
         // 2. Candidate Experience / "Tell me about yourself" queries: Synthesize fresh narrative
-        const isCandidateQuery = /(tell (me )?about (my|your) (experience|background|projects?|work|career)|tell me about yourself|who (am i|are you)|walk me through (my|your) (resume|background|cv)|what is (my|your) (experience|background)|what are (my|your) (skills|strengths|weaknesses)|what projects have (i|you) worked on|why should we hire you|my projects?|my resume|my experience|my background|introduce yourself)/i.test(normalized);
+        const isCandidateQuery = /(tell (me |us )?about (your ?self|my ?self|you)|tell (me |us )?about (my |your )?(experience|background|projects?|work|career|profile)|(give|state|share) (me |us )?(a |an |your )?(quick |brief |short )?(intro|introduction|overview|background|profile)|introduce (your ?self|urself|you)|who (are you|are u|r u|am i)|walk (me |us )?through (your |my )?(resume|background|cv|projects?|work|profile)|what is (my|your) (experience|background|role|stack)|what are (my|your) (skills|strengths|projects)|what projects have (you|i) (worked on|done|built)|why should we hire you|describe your ?self|talk about your ?self|my projects?|your projects?|my resume|your resume|my experience|your experience|my background|your background)/i.test(normalized);
         if (isCandidateQuery) {
             let facts = '';
             try {
                 facts = this.llmHelper?.getKnowledgeOrchestrator?.()?.getProfileFacts?.() || '';
             } catch (e) { /* ignore */ }
+            if (!facts) {
+                try {
+                    const { getCandidatePortfolioContent } = require('../llm/WhatToAnswerLLM');
+                    facts = getCandidatePortfolioContent();
+                } catch (e) { /* ignore */ }
+            }
 
             if (facts) {
-                const candidateSystemPrompt = `You are an expert AI interview copilot speaking directly as the candidate in first person ("I", "my", "we").
+                const candidateSystemPrompt = `You are Nishakar T's expert AI interview copilot speaking directly as the candidate, Nishakar T, in natural spoken first person ("I", "my", "we").
 The interviewer just asked: "${query}".
-Generate a cohesive, highly articulate, confident first-person interview answer:
-1. Introduce yourself clearly and speak directly to your background, expertise, and technical focus based on the profile facts below.
-2. Walk through your core work experience, key projects, metrics, and engineering achievements described in the verified facts.
+Generate a cohesive, highly articulate, confident first-person interview answer ready to speak aloud:
+1. Introduce yourself clearly as Nishakar T, an AI & ML Software Development Engineer, and speak directly to your background, expertise, and technical focus based on the profile facts below.
+2. Walk through your core work experience, key projects (Threshold AI Governance with the 8th Node FeedbackStateNode, Health Forecast AI hospital readmission model with SMOTE and class-weighting, Intel Unnati IoT Digital Twin), metrics, and engineering achievements described in the verified facts.
 3. Speak in natural, polished conversational narrative paragraphs as an impressive engineering candidate in an interview.
-4. NEVER just regurgitate or copy raw bullet points or headers like "Key Skills:". Convert all facts into natural spoken sentences.`;
+4. NEVER say "I am an AI assistant" or "I am designed to help with meetings". You are the candidate answering the interview question directly.
+5. NEVER fabricate false experience (do not claim 10+ years or technologies like Angular not in the dossier).
+6. Convert all facts into natural spoken sentences.`;
 
                 const streamOutcome: { incomplete?: boolean } = {};
                 const stream = this.llmHelper.streamChatWithGemini(

@@ -63,6 +63,69 @@ const activeJobFacts = (
   orchestrator?: ProfileAnswerBackendOrchestrator | null,
 ): MaybeStructured<StructuredJobFacts> => orchestrator?.activeJD?.structured_data ?? null;
 
+const SEED_CANDIDATE_FACTS: StructuredProfileFacts = {
+  identity: { name: 'Nishakar T' },
+  name: 'Nishakar T',
+  personal: { name: 'Nishakar T' },
+  skills: [
+    'Python', 'FastAPI', 'PyTorch', 'SQL', 'PostgreSQL', 'Docker',
+    'Machine Learning', 'Data Structures & Algorithms', 'System Design', 'WebSockets', 'LangChain', 'XGBoost', 'Scikit-learn'
+  ],
+  experience: [
+    {
+      role: 'Backend & AI Developer Intern',
+      company: 'Intel Unnati',
+      bullets: [
+        'Engineered real-time IoT Digital Twin backend platform using FastAPI and WebSockets',
+        'Implemented Isolation Forest for unsupervised anomaly detection on continuous sensor drift',
+        'Trained XGBoost regression model for Remaining Useful Life (RUL) estimation'
+      ],
+      highlights: [
+        'Engineered real-time IoT Digital Twin backend platform using FastAPI and WebSockets',
+        'Implemented Isolation Forest for unsupervised anomaly detection on continuous sensor drift',
+        'Trained XGBoost regression model for Remaining Useful Life (RUL) estimation'
+      ]
+    }
+  ],
+  projects: [
+    {
+      name: 'Threshold — AI Governance Platform',
+      title: 'Threshold — AI Governance Platform',
+      description: 'Multi-agent AI governance system featuring graduated autonomy and an 8-state deterministic risk policy machine with FeedbackStateNode (the 8th node) for closed-loop learning from human administrator decisions',
+      summary: 'Multi-agent AI governance system with graduated autonomy and 8th Node closed-loop adaptation',
+      technologies: ['FastAPI', 'PostgreSQL', 'Gemini API', 'WebSockets', 'Python', 'Docker'],
+      highlights: [
+        'Implemented 8-node state machine (DraftProposal, PolicyVerification, RiskScoring, AutonomyGate, HumanReviewQueue, ExecutionDispatch, AuditLedgerCommit, FeedbackStateNode)',
+        '8th node FeedbackStateNode recalibrates Bayesian risk parameters and dynamic autonomy thresholds based on human approvals/rejections'
+      ]
+    },
+    {
+      name: 'Health Forecast AI / MediQuery AI',
+      title: 'Health Forecast AI / MediQuery AI',
+      description: '30-day hospital readmission risk prediction model tackling extreme ~11% class imbalance in clinical EHR data',
+      summary: '30-day hospital readmission prediction with class imbalance handling',
+      technologies: ['Python', 'Scikit-learn', 'XGBoost', 'Random Forest', 'FastAPI', 'LangChain', 'ChromaDB'],
+      highlights: [
+        'Handled 11% class imbalance using SMOTE on training folds and class-weighted Random Forest & XGBoost (class_weight=balanced)',
+        'Prioritized Precision-Recall AUC (PR-AUC) and F2-score over ROC-AUC; tuned operating classification threshold to 0.32'
+      ]
+    },
+    {
+      name: 'AI-Powered Mental Wellness Platform (Voice Therapy)',
+      title: 'AI-Powered Mental Wellness Platform (Voice Therapy)',
+      description: 'End-to-end voice therapy conversation pipeline with Google STT, Gemini CBT psychologist persona, and Google TTS',
+      technologies: ['Django', 'FastAPI', 'Gemini API', 'PostgreSQL', 'Google STT', 'Google TTS', 'WebSockets']
+    }
+  ],
+  education: [
+    {
+      degree: 'B.Tech in Artificial Intelligence & Machine Learning',
+      field: 'AI & ML',
+      institution: 'Sri Shakthi Institute of Engineering and Technology'
+    }
+  ]
+};
+
 export const buildManualProfileEvidenceRoute = ({
   question,
   orchestrator,
@@ -70,7 +133,8 @@ export const buildManualProfileEvidenceRoute = ({
   answerType,
   allowedSourceKinds,
 }: BuildManualProfileBackendAnswerInput): BuildManualProfileBackendAnswerResult => {
-  const availableProfile = activeResumeFacts(orchestrator);
+  const rawProfile = activeResumeFacts(orchestrator);
+  const availableProfile = (rawProfile && profileFactsReady(rawProfile)) ? rawProfile : SEED_CANDIDATE_FACTS;
   const availableJobDescription = activeJobFacts(orchestrator);
   // Withhold an unauthorized source family BEFORE the selector sees it.
   // This is the architecturally correct placement — filter at the boundary,

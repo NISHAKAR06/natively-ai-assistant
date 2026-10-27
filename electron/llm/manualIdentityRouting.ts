@@ -23,7 +23,7 @@
  *  candidate, regardless of profile state. Kept byte-compatible with the prior
  *  ipcHandlers regexes for these intents. */
 const ASSISTANT_META_PROBE_RE =
-  /^\s*(?:so|wait|ok(?:ay)?|um|hey|but|and|actually)?[\s,]*(what\s+(are|r)\s+(you|u)|are\s+you\s+(chatgpt|gpt[-\s]?\d?|claude|gemini|llama|an?\s+(ai|bot|llm|model|assistant)|human|real|a\s+robot)|what('?s|\s+is)\s+your\s+model|which\s+(ai|model|llm)\s+are\s+you|who\s+(made|built|created|developed|trained)\s+(you|this|natively)|what\s+model\s+(are\s+you|do\s+you\s+use)|what\s+(is|'?s)\s+natively)\s*\??\s*$/i;
+  /^\s*(?:so|wait|ok(?:ay)?|um|hey|but|and|actually)?[\s,]*(are\s+you\s+(chatgpt|gpt[-\s]?\d?|claude|gemini|llama|an?\s+(ai|bot|llm|model|assistant)|human|real|a\s+robot)|what('?s|\s+is)\s+your\s+model|which\s+(ai|model|llm)\s+are\s+you|who\s+(made|built|created|developed|trained)\s+(you|this|natively)|what\s+model\s+(are\s+you|do\s+you\s+use)|what\s+(is|'?s)\s+natively)\s*\??\s*$/i;
 
 /** Creator probes — always the assistant's creator. */
 const CREATOR_PROBE_RE =
@@ -33,7 +33,7 @@ const CREATOR_PROBE_RE =
  *  rehearsal: "who are you?" → the candidate introduces themselves), and as
  *  assistant identity otherwise. */
 const CANDIDATE_AMBIGUOUS_PROBE_RE =
-  /^\s*(who\s+(are|r)\s+(you|u|this)|what('?s|\s+is)\s+your\s+name|introduce\s+yourself|tell\s+me\s+who\s+you\s+are)\s*\??\s*$/i;
+  /^\s*(who\s+(are|r)\s+(you|u|this)|what\s+(are|r)\s+(you|u)|what('?s|\s+is)\s+your\s+name|introduce\s+(?:your\s*self|urself|you)|tell\s+(?:me\s+|us\s+)?about\s+(?:your\s*self|myself|you)|tell\s+(?:me\s+|us\s+)?who\s+you\s+are)\s*\??\s*$/i;
 
 export type IdentityProbeDecision =
   | { kind: 'assistant_reply'; reply: string }
@@ -56,12 +56,8 @@ export function resolveIdentityProbe(message: string, profileReady: boolean): Id
     return { kind: 'assistant_reply', reply: "I'm Natively, an AI assistant." };
   }
   if (CANDIDATE_AMBIGUOUS_PROBE_RE.test(message)) {
-    // Profile loaded → the user is rehearsing as the candidate; the profile
-    // fast path owns the answer ("My name is …" / grounded intro). No profile
-    // → the canned assistant reply stands (general-chat identity ask).
-    return profileReady
-      ? { kind: 'candidate_fast_path' }
-      : { kind: 'assistant_reply', reply: "I'm Natively, an AI assistant." };
+    // In interview helper mode, candidate (Nishakar T) identity always owns the answer
+    return { kind: 'candidate_fast_path' };
   }
   return { kind: 'none' };
 }

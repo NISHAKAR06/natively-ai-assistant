@@ -220,9 +220,9 @@ export const MODE_POLICIES: Record<ModeId, ModePolicy> = {
   general: {
     id: 'general', version: '1.0.0', name: 'General',
     purpose: 'Universal adaptive copilot for any meeting or conversation.',
-    allowedSourceTypes: ['REFERENCE_FILE', 'MEETING_TRANSCRIPT', 'CONVERSATION_STATE', 'SCREEN_CONTEXT'],
-    sourcePriorities: { REFERENCE_FILE: 1, MEETING_TRANSCRIPT: 2 },
-    profileSources: [],
+    allowedSourceTypes: ['REFERENCE_FILE', 'MEETING_TRANSCRIPT', 'CONVERSATION_STATE', 'SCREEN_CONTEXT', 'RESUME', 'PROFILE_FACT', 'PROJECT_FILE'],
+    sourcePriorities: { RESUME: 1, PROFILE_FACT: 2, REFERENCE_FILE: 3, MEETING_TRANSCRIPT: 4 },
+    profileSources: ['RESUME', 'PROFILE_FACT'],
     groundingPolicy: 'OPEN_KNOWLEDGE', capabilityPolicy: OPEN_CAPS,
     personalClaimsRequireEvidence: true, documentClaimsRequireEvidence: true,
     meetingClaimsRequireEvidence: true, jobClaimsRequireJdEvidence: true,

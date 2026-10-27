@@ -239,7 +239,8 @@ const EXPERIENCE_PATTERNS = [
 // with a grounded first-person intro so it never reaches the LLM (which was
 // leaking "I'm Natively" / refusing). Distinct from a bare NAME ask.
 const INTRO_PATTERNS = [
-  /\btell\s+me\s+about\s+(yourself|your\s*self)\b/,
+  /\b(?:tell|talk)(?:\s+(?:me|us))?\s+about\s+(?:yourself|your\s*self|myself|you)\b/i,
+  /\b(?:tell|talk)(?:\s+(?:me|us))?\s+about\s+(?:my|your)\s+(?:experience|background|projects?|work|career|profile)\b/i,
   /\b(give|tell)\s+(me\s+)?(a\s+)?(quick|brief|short)?\s*(introduction|intro|overview of yourself|rundown)\b/,
   // Typo / greeting / SMS-spelling tolerant intro (real manual-chat log 2026-06-06b:
   // "introduce yourseld", "introduce urself", "hey man introduce yourself"). The
@@ -251,8 +252,8 @@ const INTRO_PATTERNS = [
   /\bintroduce\s+(yo?u?r?se?l?[fd]|u?r?se?l?[fd]|me to (?:you|the team))\b/,
   /\b(quick|brief|short)\s+intro\b|\b(give|do)\s+(me\s+)?(a\s+|an\s+|your\s+)?intro\b|\bintro\s+(yourself|urself|please|pls|me)\b|^intro$/,
   /\bstart\s+with\s+(an?\s+)?intro\b/,
-  /\bdescribe\s+yourself\b/,
-  /\bhow\s+(would|do)\s+you\s+describe\s+yourself\b/,
+  /\bdescribe\s+(yourself|your\s*self)\b/,
+  /\bhow\s+(would|do)\s+you\s+describe\s+(yourself|your\s*self)\b/,
   /\bsummari[sz]e\s+who\s+you\s+are\b/,
   /\b(walk\s+me\s+through|tell\s+me\s+about)\s+your\s+(background|journey|career|profile)\b/,
   /\bgive\s+(me\s+)?your\s+background\b/,
@@ -956,6 +957,7 @@ export const isCandidateProfileQuestion = (question: string): boolean => {
   const q = normalize(question);
   return hasAny(q, [
     ...NAME_PATTERNS,
+    ...INTRO_PATTERNS,
     ...EXPERIENCE_PATTERNS,
     ...PROJECT_PATTERNS,
     ...SKILL_PATTERNS,

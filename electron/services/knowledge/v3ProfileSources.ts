@@ -122,6 +122,42 @@ export function collectV3ProfileSources(orchestrator: unknown): CollectedProfile
         rawText: rawTextForDoc(ctx.activeResume.rawText, ctx.activeResume.sourceUri),
       });
       resolved.push({ role: 'profile_resume', id });
+    } else {
+      try {
+        const fs = require('fs');
+        const path = require('path');
+        const candidateCandidates = [
+          path.resolve(__dirname, '../../../../knowledge-books/Candidate_Portfolio_and_Projects.md'),
+          path.resolve(__dirname, '../../../../resources/knowledge-books/Candidate_Portfolio_and_Projects.md'),
+          path.resolve(process.cwd(), 'knowledge-books/Candidate_Portfolio_and_Projects.md'),
+          path.resolve(process.cwd(), 'resources/knowledge-books/Candidate_Portfolio_and_Projects.md'),
+        ];
+        const found = candidateCandidates.find((p: string) => fs.existsSync(p));
+        if (found) {
+          const rawText = fs.readFileSync(found, 'utf-8');
+          const id = canonicalProfileSourceId('resume');
+          const structured = {
+            identity: { name: 'Nishakar T', role: 'AI & ML Software Development Engineer' },
+            skills: ['Python', 'FastAPI', 'PyTorch', 'SQL', 'PostgreSQL', 'Docker', 'Machine Learning', 'DSA'],
+            experience: [{ role: 'Backend & AI Developer Intern', company: 'Intel Unnati', bullets: ['Engineered real-time IoT Digital Twin platform with FastAPI and WebSockets', 'Implemented Isolation Forest for anomaly detection and XGBoost for Remaining Useful Life prediction'] }],
+            projects: [
+              { name: 'Threshold — AI Governance Platform', description: 'Multi-agent AI governance system with 8-node state machine and FeedbackStateNode (8th node)' },
+              { name: 'Health Forecast AI / MediQuery AI', description: '30-day hospital readmission prediction with SMOTE, class-weighting, and 0.32 probability cutoff' },
+              { name: 'Intel Unnati Digital Twin & Predictive Maintenance', description: 'Real-time telemetry streaming and XGBoost remaining useful life forecasting' }
+            ]
+          };
+          docs.push({
+            kind: 'resume',
+            sourceId: id,
+            versionId: 'seed-candidate-dossier',
+            fileName: 'Candidate_Portfolio_and_Projects.md',
+            structured,
+            cards: resumeCards,
+            rawText,
+          });
+          resolved.push({ role: 'profile_resume', id });
+        }
+      } catch { /* ignore */ }
     }
     if (ctx.activeJD?.structured) {
       const id = canonicalProfileSourceId('jd');
@@ -141,7 +177,7 @@ export function collectV3ProfileSources(orchestrator: unknown): CollectedProfile
     return {
       docs,
       counts: {
-        profileResume: ctx.activeResume ? 1 : 0,
+        profileResume: docs.some((d) => d.kind === 'resume') ? 1 : 0,
         profileJd: ctx.activeJD ? 1 : 0,
         // No derived facts are served (2026-09-30): see the note above
         // collectV3ProfileSources — a salary ESTIMATE is not a profile fact.

@@ -202,3 +202,54 @@ test('Candidate Portfolio Dossier, 8th Node, Class Imbalance, and Anti-Pollution
   assert.ok(promptsContent.includes('ZERO TRANSCRIPT POLLUTION'), 'prompts.ts should enforce ZERO TRANSCRIPT POLLUTION');
   assert.ok(promptsContent.includes('CANDIDATE PROJECTS & GROUNDING'), 'prompts.ts should enforce CANDIDATE PROJECTS & GROUNDING');
 });
+
+test('Interview Helper Persona, Candidate Introduction Grounding, and Anti-Hallucination Guard', () => {
+  // 1. Verify manualIdentityRouting candidate probe regexes
+  const routingPath = path.join(projectRoot, 'electron', 'llm', 'manualIdentityRouting.ts');
+  const routingContent = fs.readFileSync(routingPath, 'utf-8');
+  assert.ok(routingContent.includes('CANDIDATE_AMBIGUOUS_PROBE_RE'), 'manualIdentityRouting should define CANDIDATE_AMBIGUOUS_PROBE_RE');
+  assert.ok(!routingContent.includes("what\\s+(are|r)\\s+(you|u)|are\\s+you"), 'ASSISTANT_META_PROBE_RE should not hijack what are you');
+
+  // Verify regex matches variations of tell about yourself and who are you
+  const candidateAmbiguousRegex = /^\s*(who\s+(are|r)\s+(you|u|this)|what\s+(are|r)\s+(you|u)|what('?s|\s+is)\s+your\s+name|introduce\s+(?:your\s*self|urself|you)|tell\s+(?:me\s+|us\s+)?about\s+(?:your\s*self|myself|you)|tell\s+(?:me\s+|us\s+)?who\s+you\s+are)\s*\??\s*$/i;
+
+  assert.ok(candidateAmbiguousRegex.test('tell about your self'), 'Should match tell about your self');
+  assert.ok(candidateAmbiguousRegex.test('tell about yourself'), 'Should match tell about yourself');
+  assert.ok(candidateAmbiguousRegex.test('tell me about yourself'), 'Should match tell me about yourself');
+  assert.ok(candidateAmbiguousRegex.test('tell me about your self'), 'Should match tell me about your self');
+  assert.ok(candidateAmbiguousRegex.test('who are you'), 'Should match who are you');
+  assert.ok(candidateAmbiguousRegex.test('who r u'), 'Should match who r u');
+  assert.ok(candidateAmbiguousRegex.test('introduce yourself'), 'Should match introduce yourself');
+
+  // 2. Verify LocalKnowledgeOrchestrator seeds Nishakar T profile and handles personal queries
+  const orchPath = path.join(projectRoot, 'electron', 'services', 'knowledge', 'LocalKnowledgeOrchestrator.ts');
+  const orchContent = fs.readFileSync(orchPath, 'utf-8');
+  assert.ok(orchContent.includes('seedDefaultCandidateProfile'), 'LocalKnowledgeOrchestrator should implement seedDefaultCandidateProfile');
+  assert.ok(orchContent.includes('Nishakar T'), 'LocalKnowledgeOrchestrator should seed Nishakar T as candidate name');
+  assert.ok(orchContent.includes('Threshold — AI Governance Platform'), 'LocalKnowledgeOrchestrator should include Threshold project');
+  assert.ok(orchContent.includes('Health Forecast AI / MediQuery AI'), 'LocalKnowledgeOrchestrator should include Health Forecast AI project');
+
+  // 3. Verify profileAnswerBackend has SEED_CANDIDATE_FACTS
+  const backendPath = path.join(projectRoot, 'electron', 'llm', 'profileAnswerBackend.ts');
+  const backendContent = fs.readFileSync(backendPath, 'utf-8');
+  assert.ok(backendContent.includes('SEED_CANDIDATE_FACTS'), 'profileAnswerBackend should define SEED_CANDIDATE_FACTS');
+  assert.ok(backendContent.includes('Nishakar T'), 'SEED_CANDIDATE_FACTS should specify Nishakar T');
+
+  // 4. Verify RAGManager candidate queries
+  const ragPath = path.join(projectRoot, 'electron', 'rag', 'RAGManager.ts');
+  const ragContent = fs.readFileSync(ragPath, 'utf-8');
+  assert.ok(ragContent.includes('getCandidatePortfolioContent'), 'RAGManager should load candidate portfolio content when facts missing');
+  assert.ok(ragContent.includes('Nishakar T'), 'RAGManager candidate prompt should enforce Nishakar T interview answers');
+
+  // 5. Verify RAG Prompts
+  const ragPromptsPath = path.join(projectRoot, 'electron', 'rag', 'prompts.ts');
+  const ragPromptsContent = fs.readFileSync(ragPromptsPath, 'utf-8');
+  assert.ok(ragPromptsContent.includes("expert AI interview helper and copilot, supporting Nishakar T"), 'MEETING_RAG_SYSTEM_PROMPT should be an interview copilot for Nishakar T');
+  assert.ok(ragPromptsContent.includes("candidate's expert AI interview copilot, speaking directly as the candidate, Nishakar T"), 'GLOBAL_RAG_SYSTEM_PROMPT should speak as Nishakar T');
+  assert.ok(!ragPromptsContent.includes("You are a helpful meeting assistant. Answer questions based ONLY"), 'Should not use generic meeting assistant prompt');
+
+  // 6. Verify ModePolicyRegistry general mode profile sources
+  const policyPath = path.join(projectRoot, 'electron', 'context-intelligence', 'policies', 'mode-policy-registry.ts');
+  const policyContent = fs.readFileSync(policyPath, 'utf-8');
+  assert.ok(policyContent.includes("profileSources: ['RESUME', 'PROFILE_FACT']"), 'General mode should include profileSources for candidate facts');
+});

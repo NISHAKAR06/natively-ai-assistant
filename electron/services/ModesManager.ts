@@ -759,6 +759,7 @@ export class ModesManager {
 
             const sdeMode = modes.find(m => m.templateType === 'sde-interview');
             const aimlMode = modes.find(m => m.templateType === 'aiml-interview');
+            const generalMode = modes.find(m => m.templateType === 'general');
 
             const candidateCandidates = [
                 path.resolve(__dirname, '../../knowledge-books/Candidate_Portfolio_and_Projects.md'),
@@ -824,6 +825,18 @@ export class ModesManager {
                         content: candidateContent,
                     });
                     console.log('[ModesManager] Attached Candidate_Portfolio_and_Projects.md to aiml-interview mode');
+                }
+            }
+
+            if (generalMode && candidateContent) {
+                const existingFiles = this.getReferenceFiles(generalMode.id);
+                if (!existingFiles.some(f => f.fileName.includes('Candidate_Portfolio_and_Projects'))) {
+                    this.addReferenceFile({
+                        modeId: generalMode.id,
+                        fileName: 'Candidate_Portfolio_and_Projects.md',
+                        content: candidateContent,
+                    });
+                    console.log('[ModesManager] Attached Candidate_Portfolio_and_Projects.md to general mode');
                 }
             }
         } catch (e: any) {

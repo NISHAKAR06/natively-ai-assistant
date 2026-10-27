@@ -249,6 +249,117 @@ export class LocalKnowledgeOrchestrator {
     } catch (err) {
       console.warn('[LocalKnowledgeOrchestrator] Could not load profile cache:', err);
     }
+
+    if (!this.activeResume || !this.activeResume.structured_data || !this.activeResume.structured_data.identity || this.activeResume.structured_data.identity.name === 'Candidate') {
+      this.seedDefaultCandidateProfile();
+    }
+  }
+
+  private seedDefaultCandidateProfile(): void {
+    try {
+      const candidateCandidates = [
+        path.resolve(__dirname, '../../../knowledge-books/Candidate_Portfolio_and_Projects.md'),
+        path.resolve(__dirname, '../../../resources/knowledge-books/Candidate_Portfolio_and_Projects.md'),
+        path.resolve(process.cwd(), 'knowledge-books/Candidate_Portfolio_and_Projects.md'),
+        path.resolve(process.cwd(), 'resources/knowledge-books/Candidate_Portfolio_and_Projects.md'),
+      ];
+      const foundPath = candidateCandidates.find((p: string) => fs.existsSync(p));
+      const rawText = foundPath ? fs.readFileSync(foundPath, 'utf8') : '';
+
+      const structured_data: StructuredResume = {
+        identity: {
+          name: 'Nishakar T',
+          role: 'AI & ML Software Development Engineer',
+          email: 'nishakarnishakar06@gmail.com',
+          phone: '+91 6383628949',
+          github: 'https://github.com/NISHAKAR06',
+          linkedin: 'https://linkedin.com/in/nishakar314',
+          totalExperienceYears: 1,
+        },
+        experience: [
+          {
+            role: 'Backend & AI Developer Intern',
+            company: 'Intel Unnati',
+            duration: 'Oct 2025 - Dec 2025',
+            highlights: [
+              'Engineered real-time IoT Digital Twin backend platform using FastAPI and WebSockets',
+              'Implemented Isolation Forest for unsupervised anomaly detection on continuous sensor telemetry drift',
+              'Trained XGBoost regression model for Remaining Useful Life (RUL) estimation with sub-second alert streaming'
+            ]
+          }
+        ],
+        skills: {
+          languages: ['Python', 'SQL', 'C++', 'JavaScript'],
+          frameworks: ['FastAPI', 'PyTorch', 'Django', 'Scikit-learn', 'LangChain', 'XGBoost'],
+          databases: ['PostgreSQL', 'MySQL', 'ChromaDB', 'Redis'],
+          tools: ['Docker', 'WebSockets', 'Git', 'Linux']
+        },
+        skillsFlat: [
+          'Python', 'FastAPI', 'PyTorch', 'SQL', 'PostgreSQL', 'Docker', 'Machine Learning',
+          'Data Structures & Algorithms', 'System Design', 'WebSockets', 'LangChain', 'XGBoost', 'Scikit-learn', 'Isolation Forest'
+        ],
+        projects: [
+          {
+            name: 'Threshold — AI Governance Platform',
+            description: 'Multi-agent AI governance system featuring graduated autonomy and an 8-state deterministic risk policy machine with FeedbackStateNode (the 8th node) for closed-loop learning from human administrator decisions',
+            technologies: ['FastAPI', 'PostgreSQL', 'Gemini API', 'WebSockets', 'Python', 'Docker'],
+            highlights: [
+              'Implemented 8-node state machine (DraftProposal, PolicyVerification, RiskScoring, AutonomyGate, HumanReviewQueue, ExecutionDispatch, AuditLedgerCommit, FeedbackStateNode)',
+              '8th node FeedbackStateNode recalibrates Bayesian risk parameters and dynamic autonomy thresholds based on human approvals/rejections'
+            ]
+          },
+          {
+            name: 'Health Forecast AI / MediQuery AI',
+            description: '30-day hospital readmission risk prediction model tackling extreme ~11% class imbalance in clinical EHR data',
+            technologies: ['Python', 'Scikit-learn', 'XGBoost', 'Random Forest', 'FastAPI', 'LangChain', 'ChromaDB'],
+            highlights: [
+              'Handled 11% class imbalance using SMOTE on training folds and class-weighted Random Forest & XGBoost (class_weight=balanced)',
+              'Prioritized Precision-Recall AUC (PR-AUC) and F2-score over ROC-AUC; tuned operating classification threshold to 0.32'
+            ]
+          },
+          {
+            name: 'AI-Powered Mental Wellness Platform (Voice Therapy)',
+            description: 'End-to-end voice therapy conversation pipeline with Google STT, Gemini CBT psychologist persona, and Google TTS streaming via WebSockets',
+            technologies: ['Django', 'FastAPI', 'Gemini API', 'PostgreSQL', 'Google STT', 'Google TTS', 'WebSockets'],
+            highlights: [
+              'Built multi-turn CBT dialogue pipeline with sub-second latency and stateful empathy tracking'
+            ]
+          },
+          {
+            name: 'SolidWorks Computer Vision Parts Counting',
+            description: 'Computer vision CNN parts counter classifying and counting CAD mechanical parts across 10,000+ images with 96.53% accuracy',
+            technologies: ['PyTorch', 'OpenCV', 'NumPy', 'Scikit-learn'],
+            highlights: [
+              'Trained custom PyTorch CNN reaching 96.53% exact accuracy'
+            ]
+          }
+        ],
+        education: [
+          {
+            degree: 'B.Tech in Artificial Intelligence & Machine Learning',
+            field: 'AI & ML',
+            institution: 'Sri Shakthi Institute of Engineering and Technology'
+          }
+        ],
+        githubRepositories: [
+          { name: 'Threshold', language: 'Python', description: 'Enterprise AI governance platform with graduated autonomy and 8th Node closed-loop learning' },
+          { name: 'Health-Forecast-AI', language: 'Python', description: '30-day hospital readmission prediction with class imbalance handling (SMOTE, class-weighting, 0.32 threshold)' },
+          { name: 'Intel-Unnati-Digital-Twin', language: 'Python', description: 'Industrial IoT Digital Twin with Isolation Forest and XGBoost RUL estimation' }
+        ],
+        _extraction_mode: 'heuristic'
+      };
+
+      this.activeResume = {
+        id: 1,
+        file_path: foundPath || 'Candidate_Portfolio_and_Projects.md',
+        file_name: 'Candidate_Portfolio_and_Projects.md',
+        raw_text: rawText || JSON.stringify(structured_data),
+        structured_data,
+      };
+      console.log('[LocalKnowledgeOrchestrator] Seeded default candidate profile for Nishakar T');
+    } catch (e: any) {
+      console.warn('[LocalKnowledgeOrchestrator] Failed to seed default candidate profile:', e?.message || e);
+    }
   }
 
   private saveToDisk(): void {
@@ -975,6 +1086,9 @@ ${text.slice(0, 8000)}`;
   public ensureEmbeddingSpace(): Promise<void> { return Promise.resolve(); }
 
   public getProfileFacts(): string | null {
+    if (!this.activeResume?.structured_data || !this.activeResume.structured_data.identity || this.activeResume.structured_data.identity.name === 'Candidate') {
+      this.seedDefaultCandidateProfile();
+    }
     if (!this.activeResume?.structured_data) return null;
     const id = this.activeResume.structured_data.identity || ({} as any);
     const skills = (this.activeResume.structured_data.skillsFlat || []).slice(0, 35).join(', ');
@@ -1006,7 +1120,7 @@ ${text.slice(0, 8000)}`;
       .map((r: any) => `- ${r.name} (${r.language || 'Code'}): ${r.description}`)
       .join('\n');
 
-    let relevantFacts = `Candidate Name: ${id.name || 'Candidate'}\nTitle / Role: ${id.role || 'Software Professional'}\nLocation: ${id.location || ''}\nTotal Experience: ${id.totalExperienceYears !== undefined ? id.totalExperienceYears + ' years' : 'N/A'}\nKey Skills: ${skills}\n\nWork Experience:\n${exp}`;
+    let relevantFacts = `Candidate Name: ${id.name || 'Nishakar T'}\nTitle / Role: ${id.role || 'AI & ML Software Development Engineer'}\nLocation: ${id.location || ''}\nTotal Experience: ${id.totalExperienceYears !== undefined ? id.totalExperienceYears + ' years' : '1 year'}\nKey Skills: ${skills}\n\nWork Experience:\n${exp}`;
     if (projects) {
       relevantFacts += `\n\nKey Projects:\n${projects}`;
     }
@@ -1018,7 +1132,7 @@ ${text.slice(0, 8000)}`;
   }
 
   public async processQuestion(question: string): Promise<{ relevantFacts: string; sources: string[] } | null> {
-    const isPersonalQuery = /(tell (me )?about (my|your) (experience|background|projects?|work|career)|tell me about yourself|who (am i|are you)|walk me through (my|your) (resume|background|cv)|what is (my|your) (experience|background)|what are (my|your) (skills|strengths|weaknesses)|what projects have (i|you) worked on|why should we hire you|my projects?|my resume|my experience|my background|introduce yourself)/i.test(question);
+    const isPersonalQuery = /(tell (me |us )?about (your ?self|my ?self|you)|tell (me |us )?about (my |your )?(experience|background|projects?|work|career|profile)|(give|state|share) (me |us )?(a |an |your )?(quick |brief |short )?(intro|introduction|overview|background|profile)|introduce (your ?self|urself|you)|who (are you|are u|r u|am i)|walk (me |us )?through (your |my )?(resume|background|cv|projects?|work|profile)|what is (my|your) (experience|background|role|stack)|what are (my|your) (skills|strengths|projects)|what projects have (you|i) (worked on|done|built)|why should we hire you|describe your ?self|talk about your ?self|my projects?|your projects?|my resume|your resume|my experience|your experience|my background|your background)/i.test(question);
     if (!isPersonalQuery) {
       return null;
     }
@@ -1026,7 +1140,7 @@ ${text.slice(0, 8000)}`;
     if (!facts) return null;
     return {
       relevantFacts: facts,
-      sources: [this.activeResume?.file_name || 'Resume', 'GitHub Repositories'],
+      sources: [this.activeResume?.file_name || 'Candidate_Portfolio_and_Projects.md', 'GitHub Repositories'],
     };
   }
 }
