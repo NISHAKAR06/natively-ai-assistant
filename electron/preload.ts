@@ -1296,6 +1296,8 @@ interface ElectronAPI {
   modesSaveCustomReferenceFile: (params: { modeId: string; fileName: string; content: string }) => Promise<{ success: boolean; file?: any; error?: string }>;
   knowledgeBooksGetBooks: () => Promise<{ success: boolean; books: Array<{ id: string; title: string; role: string; fileName: string; path: string; content: string }>; error?: string }>;
   knowledgeBooksOpenBook: (bookId: string) => Promise<{ success: boolean; path?: string; error?: string }>;
+  modesPickAndOpenFile: () => Promise<{ success: boolean; filePath?: string; fileName?: string; content?: string; cancelled?: boolean; error?: string }>;
+  modesOpenPathNative: (targetPath: string) => Promise<{ success: boolean; path?: string; error?: string }>;
   modesGetReferenceFileStatus: (
     modeId: string,
   ) => Promise<{ success: boolean; statuses?: Array<{ fileId: string; fileName: string; status: string; chunkCount: number }>; error?: string }>;
@@ -3294,6 +3296,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.invoke('modes:save-custom-reference-file', params),
   knowledgeBooksGetBooks: () => ipcRenderer.invoke('knowledge-books:get-books'),
   knowledgeBooksOpenBook: (bookId: string) => ipcRenderer.invoke('knowledge-books:open-book', bookId),
+  modesPickAndOpenFile: () => ipcRenderer.invoke('modes:pick-and-open-file'),
+  modesOpenPathNative: (targetPath: string) => ipcRenderer.invoke('modes:open-path-native', targetPath),
   modesGetReferenceFileStatus: (modeId: string) =>
     ipcRenderer.invoke('modes:get-reference-file-status', modeId),
   onModeFileIndexStatus: (callback: (data: { modeId: string; fileId: string; phase: 'indexing' | 'done' }) => void) => {

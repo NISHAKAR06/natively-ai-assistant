@@ -23,6 +23,9 @@ import {
   BookOpen,
   Brain,
   Plus,
+  FolderOpen,
+  FileText,
+  ExternalLink,
 } from 'lucide-react';
 import { FileViewerModal } from './ui/FileViewerModal';
 import { AddCustomFileModal } from './ui/AddCustomFileModal';
@@ -1450,9 +1453,17 @@ const NativelyInterface: React.FC<NativelyInterfaceProps> = ({
     title: string;
     fileName: string;
     content: string;
+    filePath?: string;
+    fileId?: string;
     bookId: string;
     availableBooks?: Array<{ id: string; title: string; fileName: string; content: string }>;
   } | null>(null);
+
+  const [showRoleSelector, setShowRoleSelector] = useState(false);
+  const [showFileMenu, setShowFileMenu] = useState(false);
+  const [attachedModeFiles, setAttachedModeFiles] = useState<Array<{ id: string; fileName: string; content: string }>>([]);
+  const [isAddCustomFileOpen, setIsAddCustomFileOpen] = useState(false);
+  const [activeRoleTrack, setActiveRoleTrack] = useState<string | null>(null);
 
   const handleToggleHandbookViewer = async () => {
     if (handbookViewer?.isOpen) {
@@ -1473,6 +1484,7 @@ const NativelyInterface: React.FC<NativelyInterfaceProps> = ({
           title: defaultBook.title,
           fileName: defaultBook.fileName,
           content: defaultBook.content,
+          filePath: defaultBook.path,
           bookId: defaultBook.id,
           availableBooks: res.books,
         });
@@ -1482,9 +1494,64 @@ const NativelyInterface: React.FC<NativelyInterfaceProps> = ({
     }
   };
 
-  const [showRoleSelector, setShowRoleSelector] = useState(false);
-  const [isAddCustomFileOpen, setIsAddCustomFileOpen] = useState(false);
-  const [activeRoleTrack, setActiveRoleTrack] = useState<string | null>(null);
+  const handlePickAndOpenFile = async () => {
+    setShowFileMenu(false);
+    try {
+      const api = (window as any).electronAPI;
+      const res = await api?.modesPickAndOpenFile?.();
+      if (res?.success && res.content) {
+        setHandbookViewer({
+          isOpen: true,
+          title: res.fileName || 'Opened File',
+          fileName: res.fileName || 'file',
+          content: res.content,
+          filePath: res.filePath,
+          bookId: 'custom-file',
+        });
+      } else if (res?.error) {
+        console.error('Failed to open file:', res.error);
+      }
+    } catch (err) {
+      console.error('Error picking file:', err);
+    }
+  };
+
+  const handleOpenHandbook = async (targetId: 'sde' | 'aiml') => {
+    setShowFileMenu(false);
+    const api = (window as any).electronAPI;
+    if (!api?.knowledgeBooksGetBooks) return;
+    try {
+      const res = await api.knowledgeBooksGetBooks();
+      if (res?.success && Array.isArray(res.books)) {
+        const match = res.books.find((b: any) => b.id.includes(targetId)) || res.books[0];
+        if (match) {
+          setHandbookViewer({
+            isOpen: true,
+            title: match.title,
+            fileName: match.fileName,
+            content: match.content,
+            filePath: match.path,
+            bookId: match.id,
+            availableBooks: res.books,
+          });
+        }
+      }
+    } catch (err) {
+      console.error('Error opening handbook:', err);
+    }
+  };
+
+  const handleOpenAttachedFile = (file: { id: string; fileName: string; content: string }) => {
+    setShowFileMenu(false);
+    setHandbookViewer({
+      isOpen: true,
+      title: file.fileName,
+      fileName: file.fileName,
+      content: file.content,
+      fileId: file.id,
+      bookId: 'reference-file',
+    });
+  };
 
   useEffect(() => {
     window.electronAPI?.modesGetActive?.().then((mode: any) => {
@@ -12516,11 +12583,19 @@ Provide only the answer, nothing else.`;
                     </div>
                   )}
 
-                  {!inputValue && (
-                    <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1 pointer-events-none opacity-20">
-                      <span className="text-[10px]">↵</span>
-                    </div>
-                  )}
+                  <div className="absolute right-2.5 top-1/2 -translate-y-1/2 flex items-center gap-1.5 z-10 pointer-events-auto">
+                    <button
+                      type="button"
+                      onClick={() => void handlePickAndOpenFile()}
+                      title={t('Open file from computer (.md, code, doc)')}
+                      className="p-1 rounded-md text-text-tertiary hover:text-emerald-400 hover:bg-bg-item-hover transition-colors opacity-75 hover:opacity-100"
+                    >
+                      <FolderOpen className="w-3.5 h-3.5" />
+                    </button>
+                    {!inputValue && (
+                      <span className="text-[10px] text-text-tertiary opacity-25 select-none pointer-events-none">↵</span>
+                    )}
+                  </div>
                 </div>
 
                 {/* Bottom Row. pointer-events-none on the ROW: it is a full-width,
@@ -12615,7 +12690,10 @@ Provide only the answer, nothing else.`;
                     {/* Role Selector Button & Menu */}
                     <div className="relative">
                       <button
-                        onClick={() => setShowRoleSelector((prev) => !prev)}
+                        onClick={() => {
+                          setShowRoleSelector((prev) => !prev);
+                          setShowFileMenu(false);
+                        }}
                         title={t('Current Interview Role: Click to switch between SDE, AI/ML, and General')}
                         className={`
                           flex items-center gap-1.5 px-2 h-7 rounded-[9px] border text-xs font-medium
@@ -12715,6 +12793,131 @@ Provide only the answer, nothing else.`;
                           >
                             <Plus className="w-3.5 h-3.5" />
                             <span>Add Custom File or MD Note...</span>
+                          </button>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Dedicated File Open Button & Menu */}
+                    <div className="relative">
+                      <button
+                        onClick={() => {
+                          const nextState = !showFileMenu;
+                          setShowFileMenu(nextState);
+                          setShowRoleSelector(false);
+                          if (nextState && activeRoleTrack) {
+                            window.electronAPI?.modesGetReferenceFiles?.(activeRoleTrack).then((files: any) => {
+                              if (Array.isArray(files)) setAttachedModeFiles(files);
+                            }).catch(() => {});
+                          }
+                        }}
+                        title={t('File Open: Open local files, official handbooks, or custom notes')}
+                        className={`
+                          flex items-center gap-1.5 px-2 h-7 rounded-[9px] border text-xs font-medium
+                          interaction-base interaction-press transition-all shrink-0
+                          ${
+                            showFileMenu
+                              ? 'border-emerald-500/50 bg-emerald-500/15 text-emerald-300'
+                              : 'border-border-muted bg-bg-item-surface text-text-secondary hover:text-text-primary hover:border-emerald-500/30'
+                          }
+                        `}
+                      >
+                        <FolderOpen className="w-3.5 h-3.5 text-emerald-400" />
+                        <span>File Open</span>
+                        <ChevronDown className="w-3 h-3 opacity-60 ml-0.5" />
+                      </button>
+
+                      {showFileMenu && (
+                        <div
+                          className="absolute bottom-full mb-1.5 left-0 z-[100] w-72 rounded-xl border border-border-muted bg-bg-elevated p-2 shadow-2xl backdrop-blur-md text-text-primary"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <div className="flex items-center justify-between px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-text-tertiary">
+                            <span>Document & Code Viewer</span>
+                            <span className="text-[9px] lowercase bg-bg-item-surface px-1.5 py-0.5 rounded text-emerald-400 font-mono">.md • code</span>
+                          </div>
+
+                          <button
+                            onClick={() => void handlePickAndOpenFile()}
+                            className="flex items-center gap-2.5 w-full rounded-lg px-2.5 py-2 text-xs text-left transition-colors hover:bg-emerald-500/15 hover:text-emerald-300 text-text-primary group"
+                          >
+                            <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-emerald-500/15 text-emerald-400 group-hover:bg-emerald-500/25 shrink-0">
+                              <FolderOpen className="w-4 h-4" />
+                            </div>
+                            <div className="min-w-0">
+                              <div className="font-medium text-emerald-300">Open File from Computer...</div>
+                              <div className="text-[10px] text-text-tertiary truncate">Browse .md, .txt, .py, code, or documents</div>
+                            </div>
+                          </button>
+
+                          <div className="my-1 border-t border-border-muted/50" />
+
+                          <div className="px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-text-tertiary">
+                            Official Handbooks
+                          </div>
+
+                          <button
+                            onClick={() => void handleOpenHandbook('sde')}
+                            className="flex items-center justify-between w-full rounded-lg px-2.5 py-1.5 text-xs text-left transition-colors hover:bg-bg-item-hover text-text-primary"
+                          >
+                            <div className="flex items-center gap-2">
+                              <Code className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
+                              <div>
+                                <div className="font-medium">SDE Handbook (.md)</div>
+                                <div className="text-[10px] text-text-tertiary">W3Schools & GFG Q&A with Spoken Answers</div>
+                              </div>
+                            </div>
+                            <ExternalLink className="w-3 h-3 text-text-tertiary shrink-0 ml-1" />
+                          </button>
+
+                          <button
+                            onClick={() => void handleOpenHandbook('aiml')}
+                            className="flex items-center justify-between w-full rounded-lg px-2.5 py-1.5 text-xs text-left transition-colors hover:bg-bg-item-hover text-text-primary mt-0.5"
+                          >
+                            <div className="flex items-center gap-2">
+                              <Brain className="w-3.5 h-3.5 text-purple-400 shrink-0" />
+                              <div>
+                                <div className="font-medium">AI/ML Handbook (.md)</div>
+                                <div className="text-[10px] text-text-tertiary">PyTorch, ML, LLMs & GFG Q&A</div>
+                              </div>
+                            </div>
+                            <ExternalLink className="w-3 h-3 text-text-tertiary shrink-0 ml-1" />
+                          </button>
+
+                          {attachedModeFiles.length > 0 && (
+                            <>
+                              <div className="my-1 border-t border-border-muted/50" />
+                              <div className="px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-text-tertiary">
+                                Attached Reference Files ({attachedModeFiles.length})
+                              </div>
+                              <div className="max-h-28 overflow-y-auto custom-scrollbar">
+                                {attachedModeFiles.map((file) => (
+                                  <button
+                                    key={file.id}
+                                    onClick={() => handleOpenAttachedFile(file)}
+                                    className="flex items-center justify-between w-full rounded-lg px-2.5 py-1 text-xs text-left transition-colors hover:bg-bg-item-hover text-text-primary"
+                                  >
+                                    <div className="flex items-center gap-2 truncate">
+                                      <FileText className="w-3.5 h-3.5 text-text-secondary shrink-0" />
+                                      <span className="truncate">{file.fileName}</span>
+                                    </div>
+                                  </button>
+                                ))}
+                              </div>
+                            </>
+                          )}
+
+                          <div className="my-1 border-t border-border-muted/50" />
+
+                          <button
+                            onClick={() => {
+                              setShowFileMenu(false);
+                              setIsAddCustomFileOpen(true);
+                            }}
+                            className="flex items-center gap-2 w-full rounded-lg px-2.5 py-1.5 text-xs text-accent-primary hover:bg-accent-primary/10 transition-colors"
+                          >
+                            <Plus className="w-3.5 h-3.5" />
+                            <span>Create or Upload Custom Note...</span>
                           </button>
                         </div>
                       )}
@@ -12856,6 +13059,8 @@ Provide only the answer, nothing else.`;
         title={handbookViewer.title}
         fileName={handbookViewer.fileName}
         content={handbookViewer.content}
+        filePath={handbookViewer.filePath}
+        fileId={handbookViewer.fileId}
         bookId={handbookViewer.bookId}
         availableBooks={handbookViewer.availableBooks}
         onSelectBook={(selected) => {
@@ -12866,6 +13071,7 @@ Provide only the answer, nothing else.`;
                   title: selected.title,
                   fileName: selected.fileName,
                   content: selected.content,
+                  filePath: (selected as any).path || prev.filePath,
                   bookId: selected.id,
                 }
               : null

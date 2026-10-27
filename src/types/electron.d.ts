@@ -490,6 +490,8 @@ export interface ElectronAPI {
   modesSaveCustomReferenceFile: (params: { modeId: string; fileName: string; content: string }) => Promise<{ success: boolean; file?: any; error?: string }>
   knowledgeBooksGetBooks: () => Promise<{ success: boolean; books: Array<{ id: string; title: string; role: string; fileName: string; path: string; content: string }>; error?: string }>
   knowledgeBooksOpenBook: (bookId: string) => Promise<{ success: boolean; path?: string; error?: string }>
+  modesPickAndOpenFile: () => Promise<{ success: boolean; filePath?: string; fileName?: string; content?: string; cancelled?: boolean; error?: string }>
+  modesOpenPathNative: (targetPath: string) => Promise<{ success: boolean; path?: string; error?: string }>
   modesGetReferenceFileStatus: (modeId: string) => Promise<{ success: boolean; statuses?: Array<{ fileId: string; fileName: string; status: string; chunkCount: number }>; error?: string }>
   onModeFileIndexStatus: (callback: (data: { modeId: string; fileId: string; phase: 'indexing' | 'done' }) => void) => () => void
   onKnowledgeIndexProgress: (callback: (data: { fileId: string; status: string; startedAt?: number; finishedAt?: number; error?: string }) => void) => () => void

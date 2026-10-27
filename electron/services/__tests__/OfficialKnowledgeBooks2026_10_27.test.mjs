@@ -117,3 +117,34 @@ test('UI Components integrate FileViewerModal, AddCustomFileModal, and Role Sele
   const globalChatContent = fs.readFileSync(globalChatPath, 'utf-8');
   assert.ok(globalChatContent.includes('FileViewerModal'), 'GlobalChatOverlay should use FileViewerModal');
 });
+
+test('Interface exposes direct File Open button, menu, and native OS desktop launcher', () => {
+  const nativelyInterfacePath = path.join(projectRoot, 'src', 'components', 'NativelyInterface.tsx');
+  const nativelyContent = fs.readFileSync(nativelyInterfacePath, 'utf-8');
+
+  assert.ok(nativelyContent.includes('FolderOpen'), 'NativelyInterface should import FolderOpen');
+  assert.ok(nativelyContent.includes('File Open'), 'NativelyInterface should render File Open button');
+  assert.ok(nativelyContent.includes('handlePickAndOpenFile'), 'NativelyInterface should implement handlePickAndOpenFile');
+  assert.ok(nativelyContent.includes('handleOpenHandbook'), 'NativelyInterface should implement handleOpenHandbook');
+  assert.ok(nativelyContent.includes('showFileMenu'), 'NativelyInterface should manage showFileMenu state');
+
+  const ipcPath = path.join(projectRoot, 'electron', 'ipcHandlers.ts');
+  const ipcContent = fs.readFileSync(ipcPath, 'utf-8');
+  assert.ok(ipcContent.includes('modes:pick-and-open-file'), 'ipcHandlers should implement modes:pick-and-open-file');
+  assert.ok(ipcContent.includes('modes:open-path-native'), 'ipcHandlers should implement modes:open-path-native');
+
+  const preloadPath = path.join(projectRoot, 'electron', 'preload.ts');
+  const preloadContent = fs.readFileSync(preloadPath, 'utf-8');
+  assert.ok(preloadContent.includes('modesPickAndOpenFile'), 'preload should expose modesPickAndOpenFile');
+  assert.ok(preloadContent.includes('modesOpenPathNative'), 'preload should expose modesOpenPathNative');
+
+  const typesPath = path.join(projectRoot, 'src', 'types', 'electron.d.ts');
+  const typesContent = fs.readFileSync(typesPath, 'utf-8');
+  assert.ok(typesContent.includes('modesPickAndOpenFile'), 'electron.d.ts should declare modesPickAndOpenFile');
+  assert.ok(typesContent.includes('modesOpenPathNative'), 'electron.d.ts should declare modesOpenPathNative');
+
+  const fileViewerPath = path.join(projectRoot, 'src', 'components', 'ui', 'FileViewerModal.tsx');
+  const fileViewerContent = fs.readFileSync(fileViewerPath, 'utf-8');
+  assert.ok(fileViewerContent.includes('filePath'), 'FileViewerModal should accept filePath prop');
+  assert.ok(fileViewerContent.includes('modesOpenPathNative'), 'FileViewerModal should use modesOpenPathNative');
+});

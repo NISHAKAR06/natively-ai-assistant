@@ -18753,6 +18753,64 @@ export function initializeIpcHandlers(appState: AppState): void {
     }
   });
 
+  safeHandle('modes:pick-and-open-file', async () => {
+    try {
+      const parent = BrowserWindow.getFocusedWindow() ?? BrowserWindow.getAllWindows()[0];
+      const options: Electron.OpenDialogOptions = {
+        title: 'Open File or Markdown Document',
+        properties: ['openFile'],
+        filters: [
+          { name: 'Documents & Code (*.md, *.txt, *.py, *.pdf, *.docx)', extensions: ['md', 'txt', 'py', 'js', 'ts', 'jsx', 'tsx', 'java', 'cpp', 'c', 'sql', 'json', 'pdf', 'docx'] },
+          { name: 'Markdown (*.md)', extensions: ['md', 'markdown'] },
+          { name: 'All Files (*.*)', extensions: ['*'] },
+        ],
+      };
+      const picked = parent ? await dialog.showOpenDialog(parent, options) : await dialog.showOpenDialog(options);
+      if (picked.canceled || picked.filePaths.length === 0) return { cancelled: true };
+      const filePath = picked.filePaths[0];
+      const fileName = path.basename(filePath);
+      const ext = path.extname(filePath).toLowerCase();
+
+      let content = '';
+      if (ext === '.pdf' || ext === '.docx' || ext === '.doc') {
+        try {
+          const { SafeDocumentTextExtractor } = require('./services/SafeDocumentTextExtractor');
+          const extracted = await SafeDocumentTextExtractor.extractText(filePath);
+          content = extracted?.text || '';
+        } catch {
+          content = fs.readFileSync(filePath, 'utf-8');
+        }
+      } else {
+        content = fs.readFileSync(filePath, 'utf-8');
+      }
+
+      return {
+        success: true,
+        filePath,
+        fileName,
+        content,
+      };
+    } catch (e: any) {
+      console.error('[IPC] modes:pick-and-open-file error:', e);
+      return { success: false, error: e?.message || String(e) };
+    }
+  });
+
+  safeHandle('modes:open-path-native', async (_, targetPath: string) => {
+    try {
+      if (!targetPath) return { success: false, error: 'Path not provided' };
+      const resolved = path.resolve(targetPath);
+      if (!fs.existsSync(resolved)) {
+        return { success: false, error: `File not found at: ${targetPath}` };
+      }
+      const err = await shell.openPath(resolved);
+      return err ? { success: false, error: err } : { success: true, path: resolved };
+    } catch (e: any) {
+      console.error('[IPC] modes:open-path-native error:', e);
+      return { success: false, error: e?.message || String(e) };
+    }
+  });
+
   safeHandle('knowledge-books:get-books', async () => {
     try {
       const sdeCandidates = [

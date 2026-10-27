@@ -8,6 +8,7 @@ interface FileViewerModalProps {
   title: string;
   fileName: string;
   content: string;
+  filePath?: string;
   fileId?: string;
   bookId?: string;
   availableBooks?: Array<{ id: string; title: string; fileName: string; content: string }>;
@@ -20,6 +21,7 @@ export const FileViewerModal: React.FC<FileViewerModalProps> = ({
   title,
   fileName,
   content,
+  filePath,
   fileId,
   bookId,
   availableBooks,
@@ -44,7 +46,9 @@ export const FileViewerModal: React.FC<FileViewerModalProps> = ({
     setOpeningStatus('Opening...');
     try {
       let res;
-      if (bookId && api?.knowledgeBooksOpenBook) {
+      if (filePath && api?.modesOpenPathNative) {
+        res = await api.modesOpenPathNative(filePath);
+      } else if (bookId && api?.knowledgeBooksOpenBook) {
         res = await api.knowledgeBooksOpenBook(bookId);
       } else if (fileId && api?.modesOpenReferenceFile) {
         res = await api.modesOpenReferenceFile(fileId);
