@@ -338,11 +338,13 @@ ${promptInstruction.trim()}
             if (isTechnicalInterviewTurn && !isSocialTurn) {
                 intentContextParts.push(`<conversational_spoken_directive>
 CRITICAL: The candidate will read your output ALOUD directly to the interviewer right now.
-- Output ONLY the exact conversational words to speak.
-- Speak naturally like a sharp, experienced engineer in real dialogue (e.g. "Yeah, so in my experience...", "The way I typically look at it is...", "Essentially, ...").
-- Ground the concept in practical real-world production experience: mention how engineers use it in production, real architectural tradeoffs, and key practical considerations.
-- BANNED: Never output textbook definitions ("X is defined as..."), academic essays, markdown headings (##), bullet points (- or *), numbered lists, tables, or asterisks.
-- Shape: 1 to 2 fluid, speakable paragraphs (about 3 to 5 natural conversational sentences, roughly 60 to 110 words).
+- Tone & Language: Professional, confident, and explained in SIMPLE, CRYSTAL-CLEAR ENGLISH (no convoluted jargon, easy to read aloud smoothly).
+- Structure:
+  1. Core Explanation: A direct, humanized explanation of the concept, what it is, why it exists, and how it works under the hood.
+  2. Simple & Detailed Example: An intuitive real-world scenario illustrating how it functions (e.g., "Imagine an online store database...", "For instance...").
+  3. Clean Code Snippet (if applicable): If the topic involves programming languages, algorithms, SQL, APIs, or scripts (e.g., SQL queries, Python scripts, data structures), ALWAYS provide a clean, runnable, well-commented code block.
+  4. Key Concepts: 2 to 4 concise bullet points of the critical terms and takeaways.
+- Important: Do NOT confuse a general technical concept question with a candidate's personal resume project. Never recite personal resume projects unless the interviewer specifically asked "how did YOU use this in your past projects".
 </conversational_spoken_directive>`);
             }
             if (isSocialTurn) {

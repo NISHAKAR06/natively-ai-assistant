@@ -54,6 +54,8 @@ export type ContractTemplateType =
   | 'team-meet'
   | 'lecture'
   | 'technical-interview'
+  | 'sde-interview'
+  | 'aiml-interview'
   // Campaign-3 (fix/answer-policy-engine, 2026-07-19): the 8th built-in mode.
   // "Seminar Mode" enforces the strictest answer policy — evidence required,
   // off-document Qs answered general-labeled with a visible "not from your
@@ -343,6 +345,8 @@ function isContractTemplateType(s: string | undefined): s is ContractTemplateTyp
     || s === 'team-meet'
     || s === 'lecture'
     || s === 'technical-interview'
+    || s === 'sde-interview'
+    || s === 'aiml-interview'
     // Campaign-3 (2026-07-19): add 'seminar' to the template-type whitelist
     // so seededForTemplateType round-trips for the 8th mode.
     || s === 'seminar'

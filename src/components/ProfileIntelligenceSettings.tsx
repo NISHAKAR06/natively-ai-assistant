@@ -1,10 +1,10 @@
-import React, { useState, useEffect, useRef, useLayoutEffect } from 'react';
+import React, { useState, useEffect, useRef, useLayoutEffect, useCallback } from 'react';
 import {
     X, RefreshCw, Upload, Briefcase, Trash2, Check, Globe,
     Building2, Search, AlertCircle, AlertTriangle, Gift, Info, Star,
     User, CheckCircle, ArrowUpRight, ChevronRight, Paperclip, FileText,
     GraduationCap, FolderKanban, Layers, Mail, MessageSquare, Target,
-    Edit3, Save, Github, Code, ExternalLink, Plus,
+    Edit3, Save, Github, Code, ExternalLink, Plus, Sparkles,
 } from 'lucide-react';
 import { ThinkingOrb } from 'thinking-orbs';
 import { useToggleInit } from './settings/useToggleInit';
@@ -2077,6 +2077,84 @@ export function ProfileIntelligenceSettings({
     const [isSyncingGithub, setIsSyncingGithub] = useState(false);
     const [githubSyncMsg, setGithubSyncMsg] = useState('');
 
+    // ── Role Track (SDE vs. AI/ML) Preparation Files ──
+    const [roleTrack, setRoleTrack] = useState<'sde-interview' | 'aiml-interview'>('sde-interview');
+    const [roleTrackFiles, setRoleTrackFiles] = useState<Array<{ id: string; fileName: string; pageCount?: number }>>([]);
+    const [isUploadingRoleFile, setIsUploadingRoleFile] = useState(false);
+    const [roleTrackStatus, setRoleTrackStatus] = useState<string | null>(null);
+    const [activeModeId, setActiveModeId] = useState<string | null>(null);
+
+    const loadRoleTrackFiles = useCallback(async (track: 'sde-interview' | 'aiml-interview') => {
+        try {
+            const api = (window as any).electronAPI;
+            if (!api?.modesGetReferenceFiles) return;
+            const files = await api.modesGetReferenceFiles(track);
+            setRoleTrackFiles(Array.isArray(files) ? files : []);
+            if (api?.modesGetAll) {
+                const all = await api.modesGetAll();
+                const active = all?.find((m: any) => m.isActive);
+                setActiveModeId(active?.id ?? null);
+            }
+        } catch {
+            // ignore
+        }
+    }, []);
+
+    useEffect(() => {
+        void loadRoleTrackFiles(roleTrack);
+    }, [roleTrack, loadRoleTrackFiles]);
+
+    const handleUploadRoleFile = async () => {
+        const api = (window as any).electronAPI;
+        if (!api?.modesUploadReferenceFile) return;
+        setIsUploadingRoleFile(true);
+        setRoleTrackStatus('Uploading & indexing file...');
+        try {
+            const res = await api.modesUploadReferenceFile(roleTrack);
+            if (res?.success) {
+                await loadRoleTrackFiles(roleTrack);
+                setRoleTrackStatus('File indexed successfully!');
+                setTimeout(() => setRoleTrackStatus(null), 2500);
+            } else if (res?.error && !res?.cancelled) {
+                setRoleTrackStatus(`Error: ${res.error}`);
+                setTimeout(() => setRoleTrackStatus(null), 3500);
+            } else {
+                setRoleTrackStatus(null);
+            }
+        } catch (e: any) {
+            setRoleTrackStatus(`Error: ${e.message}`);
+            setTimeout(() => setRoleTrackStatus(null), 3500);
+        } finally {
+            setIsUploadingRoleFile(false);
+        }
+    };
+
+    const handleDeleteRoleFile = async (fileId: string) => {
+        const api = (window as any).electronAPI;
+        if (!api?.modesDeleteReferenceFile) return;
+        try {
+            const res = await api.modesDeleteReferenceFile(fileId);
+            if (res?.success) {
+                await loadRoleTrackFiles(roleTrack);
+            }
+        } catch {
+            // ignore
+        }
+    };
+
+    const handleActivateTrackMode = async (track: 'sde-interview' | 'aiml-interview') => {
+        const api = (window as any).electronAPI;
+        if (!api?.modesSetActive) return;
+        try {
+            const res = await api.modesSetActive(activeModeId === track ? null : track);
+            if (res?.success) {
+                await loadRoleTrackFiles(track);
+            }
+        } catch {
+            // ignore
+        }
+    };
+
     const openProfileEditor = () => {
         const id = profileData?.identity || {};
         let flatSkills: string[] = [];
@@ -3313,27 +3391,221 @@ export function ProfileIntelligenceSettings({
                 </div>
             )}
 
+            {/* Role Track & Role-Specific Reference Files (SDE vs. AI/ML) */}
+            <div style={{ marginTop: 24, marginBottom: 12 }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                    <div>
+                        <h3 className="pi-section-label" style={{ margin: 0 }}>Interview Role Track & Preparation Files</h3>
+                        <p style={{ fontSize: 12, color: 'var(--pi-secondary)', margin: '4px 0 0', lineHeight: 1.5 }}>
+                            Select your target role track to attach specialized prep files (DSA, System Design, PyTorch, LLMs).
+                        </p>
+                    </div>
+                </div>
+
+                {/* Track Switcher Segmented Control */}
+                <div style={{ display: 'flex', gap: 8, marginTop: 10, marginBottom: 12 }}>
+                    <button
+                        type="button"
+                        className="pi-press"
+                        onClick={() => setRoleTrack('sde-interview')}
+                        style={{
+                            flex: 1,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: 7,
+                            padding: '8px 12px',
+                            borderRadius: 'var(--pi-r-md)',
+                            fontSize: 12,
+                            fontWeight: 600,
+                            border: roleTrack === 'sde-interview' ? '1px solid rgba(6, 182, 212, 0.4)' : '1px solid var(--pi-border)',
+                            background: roleTrack === 'sde-interview' ? 'rgba(6, 182, 212, 0.12)' : 'var(--pi-btn-bg)',
+                            color: roleTrack === 'sde-interview' ? '#67e8f9' : 'var(--pi-secondary)',
+                            cursor: 'pointer',
+                            transition: 'all 160ms ease',
+                        }}
+                    >
+                        <Code size={13} style={{ color: roleTrack === 'sde-interview' ? '#22d3ee' : 'inherit' }} />
+                        <span>SDE Role Track (DSA & System Design)</span>
+                    </button>
+
+                    <button
+                        type="button"
+                        className="pi-press"
+                        onClick={() => setRoleTrack('aiml-interview')}
+                        style={{
+                            flex: 1,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: 7,
+                            padding: '8px 12px',
+                            borderRadius: 'var(--pi-r-md)',
+                            fontSize: 12,
+                            fontWeight: 600,
+                            border: roleTrack === 'aiml-interview' ? '1px solid rgba(168, 85, 247, 0.4)' : '1px solid var(--pi-border)',
+                            background: roleTrack === 'aiml-interview' ? 'rgba(168, 85, 247, 0.12)' : 'var(--pi-btn-bg)',
+                            color: roleTrack === 'aiml-interview' ? '#d8b4fe' : 'var(--pi-secondary)',
+                            cursor: 'pointer',
+                            transition: 'all 160ms ease',
+                        }}
+                    >
+                        <Sparkles size={13} style={{ color: roleTrack === 'aiml-interview' ? '#c084fc' : 'inherit' }} />
+                        <span>AI / ML Role Track (DL, PyTorch & LLMs)</span>
+                    </button>
+                </div>
+
+                {/* Track Details & File Ingest Container */}
+                <div style={{
+                    padding: '12px 14px',
+                    borderRadius: 'var(--pi-r-md)',
+                    border: '1px solid var(--pi-border)',
+                    background: 'rgba(255,255,255,0.015)',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: 10,
+                }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
+                        <div>
+                            <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--pi-primary)' }}>
+                                {roleTrack === 'sde-interview' ? 'Software Development Engineer Reference Files' : 'AI / Machine Learning Reference Files'}
+                            </span>
+                            <p style={{ margin: '3px 0 0', fontSize: 11, color: 'var(--pi-tertiary)', lineHeight: 1.4 }}>
+                                {roleTrack === 'sde-interview'
+                                    ? 'Indexed for DSA patterns, System Design notes, and clean runnable code examples.'
+                                    : 'Indexed for Deep Learning architectures, PyTorch notes, Transformers, and LLM fine-tuning.'}
+                            </p>
+                        </div>
+
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <button
+                                type="button"
+                                className="pi-press"
+                                onClick={() => handleActivateTrackMode(roleTrack)}
+                                style={{
+                                    fontSize: 11,
+                                    fontWeight: 500,
+                                    padding: '4px 9px',
+                                    borderRadius: 'var(--pi-r-pill)',
+                                    border: activeModeId === roleTrack ? '1px solid rgba(16, 185, 129, 0.4)' : '1px solid var(--pi-btn-border)',
+                                    background: activeModeId === roleTrack ? 'rgba(16, 185, 129, 0.15)' : 'var(--pi-btn-bg)',
+                                    color: activeModeId === roleTrack ? '#34d399' : 'var(--pi-secondary)',
+                                    cursor: 'pointer',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: 4,
+                                }}
+                            >
+                                <Check size={11} style={{ opacity: activeModeId === roleTrack ? 1 : 0.4 }} />
+                                {activeModeId === roleTrack ? 'Mode Active' : 'Set as Active Mode'}
+                            </button>
+
+                            <button
+                                type="button"
+                                className="pi-press"
+                                disabled={isUploadingRoleFile}
+                                onClick={handleUploadRoleFile}
+                                style={{
+                                    fontSize: 11,
+                                    fontWeight: 600,
+                                    padding: '5px 12px',
+                                    borderRadius: 'var(--pi-r-pill)',
+                                    border: '1px solid var(--pi-accent-border)',
+                                    background: 'var(--pi-accent-subtle)',
+                                    color: 'var(--pi-accent)',
+                                    cursor: isUploadingRoleFile ? 'not-allowed' : 'pointer',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: 5,
+                                }}
+                            >
+                                {isUploadingRoleFile ? <RefreshCw size={11} className="animate-spin" /> : <Upload size={11} />}
+                                {roleTrack === 'sde-interview' ? 'Upload SDE File' : 'Upload AI/ML File'}
+                            </button>
+                        </div>
+                    </div>
+
+                    {roleTrackStatus && (
+                        <div style={{ fontSize: 11, color: 'var(--pi-accent)', padding: '4px 8px', borderRadius: 4, background: 'var(--pi-accent-subtle)' }}>
+                            {roleTrackStatus}
+                        </div>
+                    )}
+
+                    {/* Uploaded File List */}
+                    {roleTrackFiles.length === 0 ? (
+                        <div style={{
+                            padding: '12px',
+                            textAlign: 'center',
+                            fontSize: 11,
+                            color: 'var(--pi-tertiary)',
+                            border: '1px dashed var(--pi-border)',
+                            borderRadius: 'var(--pi-r-md)',
+                        }}>
+                            {roleTrack === 'sde-interview'
+                                ? 'No SDE files uploaded yet. Add LeetCode notes, System Design summaries, or SDE resume.'
+                                : 'No AI/ML files uploaded yet. Add PyTorch notes, Transformer cheat sheets, or AI/ML resume.'}
+                        </div>
+                    ) : (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                            {roleTrackFiles.map(f => (
+                                <div
+                                    key={f.id}
+                                    style={{
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'space-between',
+                                        padding: '6px 10px',
+                                        background: 'var(--pi-btn-bg)',
+                                        border: '1px solid var(--pi-btn-border)',
+                                        borderRadius: 'var(--pi-r-md)',
+                                        fontSize: 11,
+                                    }}
+                                >
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, overflow: 'hidden' }}>
+                                        <FileText size={12} style={{ color: roleTrack === 'sde-interview' ? '#22d3ee' : '#c084fc', flexShrink: 0 }} />
+                                        <span style={{ color: 'var(--pi-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                            {f.fileName}
+                                        </span>
+                                        {f.pageCount ? (
+                                            <span style={{ color: 'var(--pi-tertiary)', fontSize: 10 }}>({f.pageCount} pages)</span>
+                                        ) : null}
+                                    </div>
+                                    <button
+                                        type="button"
+                                        className="pi-press-soft"
+                                        onClick={() => handleDeleteRoleFile(f.id)}
+                                        style={{ background: 'none', border: 'none', color: 'var(--pi-tertiary)', padding: 3, cursor: 'pointer', borderRadius: 4 }}
+                                        onMouseEnter={e => (e.currentTarget.style.color = 'var(--pi-danger)')}
+                                        onMouseLeave={e => (e.currentTarget.style.color = 'var(--pi-tertiary)')}
+                                        title="Remove file"
+                                    >
+                                        <Trash2 size={12} />
+                                    </button>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+            </div>
+
             {/* Scope note — applies to BOTH files above, so it closes the section
                 rather than sitting under either card. Deliberately borderless: a
                 third bordered box after two would read as another upload target.
                 11px/tertiary puts it below the cards' own hint text in the type
                 hierarchy, which is what a footnote should be.
 
-                The two named modes are the ONLY ones whose policy opts into
+                The named modes are the ones whose policy opts into
                 profile hydration — MODE_POLICIES.profileSources is non-empty for
-                'looking-for-work' and 'technical-interview' and [] for general,
-                sales, recruiting, team-meet, lecture and seminar (see
-                electron/context-intelligence/policies/mode-policy-registry.ts).
-                Custom modes fall back to 'general', so they get nothing either.
-                If that registry gains a profile-aware mode, this line must move
-                with it. */}
-            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 7, marginTop: 2 }}>
+                'looking-for-work', 'technical-interview', 'sde-interview', and
+                'aiml-interview' (see electron/context-intelligence/policies/mode-policy-registry.ts). */}
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 7, marginTop: 4 }}>
                 <Info size={12} style={{ color: 'var(--pi-tertiary)', flexShrink: 0, marginTop: 1 }} />
                 <p style={{ fontSize: 11, color: 'var(--pi-tertiary)', margin: 0, lineHeight: 1.5 }}>
-                    Used only in{' '}
-                    <span style={{ color: 'var(--pi-secondary)', fontWeight: 500 }}>Looking for work</span>{' '}
-                    and{' '}
-                    <span style={{ color: 'var(--pi-secondary)', fontWeight: 500 }}>Technical Interview</span>{' '}
+                    Used in{' '}
+                    <span style={{ color: 'var(--pi-secondary)', fontWeight: 500 }}>Looking for work</span>,{' '}
+                    <span style={{ color: 'var(--pi-secondary)', fontWeight: 500 }}>Technical Interview</span>,{' '}
+                    <span style={{ color: 'var(--pi-secondary)', fontWeight: 500 }}>SDE Interview</span>, and{' '}
+                    <span style={{ color: 'var(--pi-secondary)', fontWeight: 500 }}>AI/ML Interview</span>{' '}
                     modes. Other modes never receive them.
                 </p>
             </div>

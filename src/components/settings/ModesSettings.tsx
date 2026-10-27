@@ -1,11 +1,13 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { X, Plus, Trash2, Upload, FileText, Check, Sparkles, Save, Loader2 } from 'lucide-react';
+import { X, Plus, Trash2, Upload, FileText, Check, Sparkles, Save, Loader2, Code, Brain } from 'lucide-react';
 import { ModesSettings as PremiumModesSettings } from '../../premium';
 import { AipSelect } from './AIProvidersSettings';
 
 const TEMPLATE_OPTIONS = [
   { value: 'general', label: 'General' },
-  { value: 'technical-interview', label: 'Technical Interview' },
+  { value: 'technical-interview', label: 'Technical Interview (General)' },
+  { value: 'sde-interview', label: 'SDE Interview (DSA, System Design, Coding)' },
+  { value: 'aiml-interview', label: 'AI/ML Interview (Deep Learning, PyTorch, LLMs)' },
   { value: 'looking-for-work', label: 'Looking for Work' },
   { value: 'sales', label: 'Sales' },
   { value: 'recruiting', label: 'Recruiting' },
@@ -338,11 +340,39 @@ const BuiltinModesSettings: React.FC<ModesSettingsProps> = ({ onClose }) => {
               </div>
             </div>
 
+            {/* Role Track Indicator Banner */}
+            {selectedMode.templateType === 'sde-interview' && (
+              <div className="flex items-center gap-2.5 rounded-lg border border-cyan-500/30 bg-cyan-500/10 px-3.5 py-2.5 text-xs text-cyan-200">
+                <Code className="h-4 w-4 shrink-0 text-cyan-400" />
+                <div>
+                  <span className="font-semibold text-cyan-300">SDE Interview Track Active</span>
+                  <p className="mt-0.5 text-[11px] text-cyan-200/80">
+                    Optimized for Software Engineering interviews: DSA patterns, System Design architectures, clean runnable code examples, and technical explanations in simple spoken English.
+                  </p>
+                </div>
+              </div>
+            )}
+            {selectedMode.templateType === 'aiml-interview' && (
+              <div className="flex items-center gap-2.5 rounded-lg border border-purple-500/30 bg-purple-500/10 px-3.5 py-2.5 text-xs text-purple-200">
+                <Brain className="h-4 w-4 shrink-0 text-purple-400" />
+                <div>
+                  <span className="font-semibold text-purple-300">AI / ML Interview Track Active</span>
+                  <p className="mt-0.5 text-[11px] text-purple-200/80">
+                    Optimized for AI/ML Engineer interviews: Deep Learning, PyTorch, Transformers, LLMs, fine-tuning techniques, loss functions, and production ML pipelines.
+                  </p>
+                </div>
+              </div>
+            )}
+
             {/* Custom Context / Instructions */}
             <div className="flex flex-col">
               <div className="mb-1.5 flex items-center justify-between">
                 <label className="text-xs font-medium text-text-secondary">
-                  Custom Context, Resume Summary, JD & Instructions
+                  {selectedMode.templateType === 'sde-interview'
+                    ? 'SDE Role Context, DSA Sheets, Architecture Guidelines & JD'
+                    : selectedMode.templateType === 'aiml-interview'
+                    ? 'AI/ML Role Context, Model Architectures, Frameworks & JD'
+                    : 'Custom Context, Resume Summary, JD & Instructions'}
                 </label>
                 <span className="text-[11px] text-text-secondary">
                   {editContext.length} / 8000 chars
@@ -353,7 +383,13 @@ const BuiltinModesSettings: React.FC<ModesSettingsProps> = ({ onClose }) => {
                 maxLength={8000}
                 value={editContext}
                 onChange={(e) => setEditContext(e.target.value)}
-                placeholder="Paste your resume highlights, target Job Description (JD), company notes, or custom instructions for this mode..."
+                placeholder={
+                  selectedMode.templateType === 'sde-interview'
+                    ? 'Paste your SDE resume highlights, target software engineering role JD, LeetCode / DSA problem lists, System Design notes, or coding guidelines...'
+                    : selectedMode.templateType === 'aiml-interview'
+                    ? 'Paste your AI/ML resume highlights, target machine learning engineer JD, model training & fine-tuning notes, PyTorch/Transformer cheat sheets, or metrics...'
+                    : 'Paste your resume highlights, target Job Description (JD), company notes, or custom instructions for this mode...'
+                }
                 className="w-full rounded-lg border border-border-muted bg-bg-input p-3 text-xs leading-relaxed text-text-primary focus:outline-none"
               />
             </div>
@@ -363,10 +399,18 @@ const BuiltinModesSettings: React.FC<ModesSettingsProps> = ({ onClose }) => {
               <div className="flex items-center justify-between">
                 <div>
                   <h3 className="text-xs font-semibold text-text-primary">
-                    Reference Files (Local Hybrid RAG)
+                    {selectedMode.templateType === 'sde-interview'
+                      ? 'SDE Reference Files & Prep Sheets (Local Hybrid RAG)'
+                      : selectedMode.templateType === 'aiml-interview'
+                      ? 'AI/ML Reference Files & Model Notes (Local Hybrid RAG)'
+                      : 'Reference Files (Local Hybrid RAG)'}
                   </h3>
                   <p className="text-[11px] text-text-secondary">
-                    Upload PDFs, DOCX resumes, job descriptions, lecture notes, or code files for instant local retrieval.
+                    {selectedMode.templateType === 'sde-interview'
+                      ? 'Upload SDE resume, LeetCode / DSA problem sheets, System Design diagrams, or code samples for instant retrieval during interviews.'
+                      : selectedMode.templateType === 'aiml-interview'
+                      ? 'Upload AI/ML resume, Deep Learning notes, PyTorch/Transformer cheat sheets, or ML papers for instant retrieval during interviews.'
+                      : 'Upload PDFs, DOCX resumes, job descriptions, lecture notes, or code files for instant local retrieval.'}
                   </p>
                 </div>
                 <button
@@ -379,13 +423,21 @@ const BuiltinModesSettings: React.FC<ModesSettingsProps> = ({ onClose }) => {
                   ) : (
                     <Upload className="h-3.5 w-3.5" />
                   )}
-                  Upload File
+                  {selectedMode.templateType === 'sde-interview'
+                    ? 'Upload SDE File'
+                    : selectedMode.templateType === 'aiml-interview'
+                    ? 'Upload AI/ML File'
+                    : 'Upload File'}
                 </button>
               </div>
 
               {refFiles.length === 0 ? (
                 <div className="rounded-lg border border-dashed border-border-muted p-4 text-center text-xs text-text-secondary">
-                  No reference files attached to this mode yet.
+                  {selectedMode.templateType === 'sde-interview'
+                    ? 'No SDE reference files attached yet. Upload DSA sheets, System Design notes, or SDE resume.'
+                    : selectedMode.templateType === 'aiml-interview'
+                    ? 'No AI/ML reference files attached yet. Upload model notes, PyTorch docs, or AI/ML resume.'
+                    : 'No reference files attached to this mode yet.'}
                 </div>
               ) : (
                 <div className="space-y-1.5">

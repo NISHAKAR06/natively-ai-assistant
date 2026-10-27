@@ -2250,7 +2250,7 @@ export function initializeIpcHandlers(appState: AppState): void {
                   const w = speechWindowForPrompt(formatted);
                   return w.trim() ? w : undefined;
                 } catch { return undefined; }
-              })() : undefined,
+              })() : (context || undefined),
               // Settings > Intelligence > Memory > "Chat history". Read HERE, not
               // in the bridge: context-intelligence has no dependency on the flag
               // registry (see contracts/retrieval-flags.ts for what the first one
@@ -2742,6 +2742,8 @@ export function initializeIpcHandlers(appState: AppState): void {
                     v3ConversationSessionId(appState, senderId),
                     finalText,
                     v3ScreenDescription || undefined,
+                    v3Question,
+                    { anchor: true },
                   );
                 } catch { /* continuity only */ }
                 try {
@@ -16929,7 +16931,7 @@ export function initializeIpcHandlers(appState: AppState): void {
   });
 
   // Query global (cross-meeting search)
-  safeHandle('rag:query-global', async (event, { query }: { query: string }) => {
+  safeHandle('rag:query-global', async (event, { query, conversationHistory }: { query: string; conversationHistory?: string }) => {
     const ragManager = appState.getRAGManager();
 
     if (!ragManager || !ragManager.isReady()) {
@@ -16943,7 +16945,7 @@ export function initializeIpcHandlers(appState: AppState): void {
     activeRAGQueries.set(queryKey, abortController);
 
     try {
-      const stream = ragManager.queryGlobal(query, abortController.signal);
+      const stream = ragManager.queryGlobal(query, abortController.signal, conversationHistory);
 
       for await (const chunk of stream) {
         if (abortController.signal.aborted) break;
@@ -16963,6 +16965,17 @@ export function initializeIpcHandlers(appState: AppState): void {
     } finally {
       activeRAGQueries.delete(queryKey);
     }
+  });
+
+  safeHandle('rag:get-session-history', async () => {
+    const ragManager = appState.getRAGManager();
+    return ragManager?.getSessionHistory?.() ?? [];
+  });
+
+  safeHandle('rag:clear-session-history', async () => {
+    const ragManager = appState.getRAGManager();
+    ragManager?.clearSessionHistory?.();
+    return { success: true };
   });
 
   // Cancel active RAG query

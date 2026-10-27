@@ -28,6 +28,8 @@ export type ModeId =
   | 'team-meet'
   | 'looking-for-work'
   | 'technical-interview'
+  | 'sde-interview'
+  | 'aiml-interview'
   | 'lecture'
   | 'seminar'
   // 9th built-in (2026-08-23): support / call-center.
@@ -35,7 +37,7 @@ export type ModeId =
 
 export const MODE_IDS: readonly ModeId[] = [
   'general', 'sales', 'recruiting', 'team-meet',
-  'looking-for-work', 'technical-interview', 'lecture', 'seminar',
+  'looking-for-work', 'technical-interview', 'sde-interview', 'aiml-interview', 'lecture', 'seminar',
   'call-center',
 ] as const;
 
@@ -347,6 +349,36 @@ export const MODE_POLICIES: Record<ModeId, ModePolicy> = {
     // Same latent defect as looking-for-work: RESUME was planned but had no
     // pool without duplicate attachments. JD/résumé hydrate; PROFILE_FACT is
     // not in this mode's allowlist so it is not opted in.
+    profileSources: ['RESUME', 'JOB_DESCRIPTION'],
+    groundingPolicy: 'SOURCE_FIRST', capabilityPolicy: OPEN_CAPS,
+    personalClaimsRequireEvidence: true, documentClaimsRequireEvidence: true,
+    meetingClaimsRequireEvidence: true, jobClaimsRequireJdEvidence: true,
+    retrievalPolicy: retrieval(20, 6), contextBudget: budget(1600, 2400, 700, 800),
+    autoAnswer: AUTO_ANSWER_INTERVIEW,
+    citations: 'HIDDEN',
+    attachedMaterialIsPrimary: false,
+  },
+
+  'sde-interview': {
+    id: 'sde-interview', version: '1.0.0', name: 'SDE Interview',
+    purpose: 'Software Development Engineer coding, DSA, system design, and technical concepts.',
+    allowedSourceTypes: ['RESUME', 'JOB_DESCRIPTION', 'PROJECT_FILE', 'CODING_SAMPLE', 'REFERENCE_FILE', 'MEETING_TRANSCRIPT', 'SCREEN_CONTEXT', 'CONVERSATION_STATE'],
+    sourcePriorities: { RESUME: 1, PROJECT_FILE: 2, CODING_SAMPLE: 3, REFERENCE_FILE: 4, JOB_DESCRIPTION: 5, MEETING_TRANSCRIPT: 6 },
+    profileSources: ['RESUME', 'JOB_DESCRIPTION'],
+    groundingPolicy: 'SOURCE_FIRST', capabilityPolicy: OPEN_CAPS,
+    personalClaimsRequireEvidence: true, documentClaimsRequireEvidence: true,
+    meetingClaimsRequireEvidence: true, jobClaimsRequireJdEvidence: true,
+    retrievalPolicy: retrieval(20, 6), contextBudget: budget(1600, 2400, 700, 800),
+    autoAnswer: AUTO_ANSWER_INTERVIEW,
+    citations: 'HIDDEN',
+    attachedMaterialIsPrimary: false,
+  },
+
+  'aiml-interview': {
+    id: 'aiml-interview', version: '1.0.0', name: 'AI / ML Interview',
+    purpose: 'AI and Machine Learning engineering, deep learning, PyTorch, LLMs, and model architecture.',
+    allowedSourceTypes: ['RESUME', 'JOB_DESCRIPTION', 'PROJECT_FILE', 'CODING_SAMPLE', 'REFERENCE_FILE', 'MEETING_TRANSCRIPT', 'SCREEN_CONTEXT', 'CONVERSATION_STATE'],
+    sourcePriorities: { RESUME: 1, PROJECT_FILE: 2, CODING_SAMPLE: 3, REFERENCE_FILE: 4, JOB_DESCRIPTION: 5, MEETING_TRANSCRIPT: 6 },
     profileSources: ['RESUME', 'JOB_DESCRIPTION'],
     groundingPolicy: 'SOURCE_FIRST', capabilityPolicy: OPEN_CAPS,
     personalClaimsRequireEvidence: true, documentClaimsRequireEvidence: true,

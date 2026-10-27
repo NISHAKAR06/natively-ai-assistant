@@ -998,7 +998,9 @@ export interface ElectronAPI {
   // RAG (Retrieval-Augmented Generation) API
   ragQueryMeeting: (meetingId: string, query: string) => Promise<{ success?: boolean; fallback?: boolean; error?: string }>
   ragQueryLive: (query: string) => Promise<{ success?: boolean; fallback?: boolean; error?: string }>
-  ragQueryGlobal: (query: string) => Promise<{ success?: boolean; fallback?: boolean; error?: string }>
+  ragQueryGlobal: (query: string, conversationHistory?: string) => Promise<{ success?: boolean; fallback?: boolean; error?: string }>
+  ragGetSessionHistory: () => Promise<Array<{ role: 'user' | 'assistant'; text: string; timestamp: number }>>
+  ragClearSessionHistory: () => Promise<{ success: boolean }>
   ragCancelQuery: (options: { meetingId?: string; global?: boolean }) => Promise<{ success: boolean }>
   ragIsMeetingProcessed: (meetingId: string) => Promise<boolean>
   ragGetQueueStatus: () => Promise<{ pending: number; processing: number; completed: number; failed: number }>

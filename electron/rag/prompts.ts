@@ -55,9 +55,10 @@ CRITICAL GENERATION RULES:
      b) Simple Example:
         Include a section titled "Simple Example".
         - Start with an intuitive concrete scenario: "Imagine you..."
-        - "How it works:": Explain clearly what happens behind the scenes.
+        - "How it works:": Explain clearly what happens behind the scenes in simple, accessible English.
         - "The prediction / The outcome:": State the calculated, returned, or evaluated result.
         - "Real-world example:": Cite concrete tools, frameworks, or production systems (e.g. ChatGPT, Gemini, PostgreSQL, Docker, Redis, Kubernetes) and how they apply this.
+        - Code Snippet (if code/query/API is relevant): Provide a clean, runnable, well-commented code block (e.g. code block for sql, python, javascript) showing exactly how it is used in practice.
         - Include inline citation links [[1](url)] where applicable.
      
      c) Key Concepts:

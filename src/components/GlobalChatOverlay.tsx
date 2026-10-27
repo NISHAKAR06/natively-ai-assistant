@@ -168,12 +168,23 @@ const GlobalChatOverlay: React.FC<GlobalChatOverlayProps> = ({
     // completion can render empty. A ref updates immediately, no batching.
     const submitInFlightRef = useRef(false);
 
-    // Submit initial query when overlay opens
+    // Submit initial query when overlay opens, or restore session history
     useEffect(() => {
         if (isOpen && initialQuery && messages.length === 0) {
             setTimeout(() => {
                 submitQuestion(initialQuery);
             }, 100);
+        } else if (isOpen && messages.length === 0 && !initialQuery) {
+            window.electronAPI?.ragGetSessionHistory?.().then((history: any) => {
+                if (Array.isArray(history) && history.length > 0) {
+                    setMessages(history.map((h: any, idx: number) => ({
+                        id: `hist-${idx}-${h.timestamp}`,
+                        role: h.role === 'user' ? 'user' : 'assistant',
+                        content: h.text,
+                        isStreaming: false
+                    })));
+                }
+            }).catch(() => {});
         }
     }, [isOpen, initialQuery]);
 
@@ -322,7 +333,12 @@ const GlobalChatOverlay: React.FC<GlobalChatOverlayProps> = ({
             // without emitting a single token for 60s, show error. Once streaming starts,
             // let it stream to natural completion without false timeouts.
             let result: { fallback?: boolean; success?: boolean; error?: string } | undefined;
-            const call = window.electronAPI?.ragQueryGlobal(question);
+            const conversationHistory = messages
+                .filter(m => m.content && m.content.trim().length > 0)
+                .slice(-8)
+                .map(m => `${m.role === 'user' ? 'User' : 'Assistant'}: ${m.content}`)
+                .join('\n');
+            const call = window.electronAPI?.ragQueryGlobal(question, conversationHistory);
             if (call) {
                 let timeoutHandle: any;
                 const timeoutPromise = new Promise<never>((_, reject) => {

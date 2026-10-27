@@ -35,6 +35,8 @@ export type ModeTemplateType =
     | 'team-meet'
     | 'lecture'
     | 'technical-interview'
+    | 'sde-interview'
+    | 'aiml-interview'
     // Campaign-3 (fix/answer-policy-engine, 2026-07-19): 8th built-in mode.
     // 'seminar' enforces `evidencePreference=required` + `say_not_found_then_answer_general`
     // (the founder's strictest profile). Mirrored in three places:
@@ -125,6 +127,8 @@ export const MODE_CONTEXT_PROFILES: Record<ModeTemplateType, ModeContextProfile>
     // reference files; no candidate-profile fallback shape applies.
     'call-center': NEUTRAL,
     'technical-interview': NEUTRAL,
+    'sde-interview': NEUTRAL,
+    'aiml-interview': NEUTRAL,
     'looking-for-work': NEUTRAL,
     'sales': {
         fallbackLiveAnswerType: 'sales_answer',

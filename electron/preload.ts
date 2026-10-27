@@ -906,7 +906,10 @@ interface ElectronAPI {
   ) => Promise<{ success?: boolean; fallback?: boolean; error?: string }>;
   ragQueryGlobal: (
     query: string,
+    conversationHistory?: string,
   ) => Promise<{ success?: boolean; fallback?: boolean; error?: string }>;
+  ragGetSessionHistory: () => Promise<Array<{ role: 'user' | 'assistant'; text: string; timestamp: number }>>;
+  ragClearSessionHistory: () => Promise<{ success: boolean }>;
   ragCancelQuery: (options: {
     meetingId?: string;
     global?: boolean;
@@ -2824,7 +2827,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   ragQueryMeeting: (meetingId: string, query: string) =>
     ipcRenderer.invoke('rag:query-meeting', { meetingId, query }),
   ragQueryLive: (query: string) => ipcRenderer.invoke('rag:query-live', { query }),
-  ragQueryGlobal: (query: string) => ipcRenderer.invoke('rag:query-global', { query }),
+  ragQueryGlobal: (query: string, conversationHistory?: string) =>
+    ipcRenderer.invoke('rag:query-global', { query, conversationHistory }),
+  ragGetSessionHistory: () => ipcRenderer.invoke('rag:get-session-history'),
+  ragClearSessionHistory: () => ipcRenderer.invoke('rag:clear-session-history'),
   ragCancelQuery: (options: { meetingId?: string; global?: boolean }) =>
     ipcRenderer.invoke('rag:cancel-query', options),
   ragIsMeetingProcessed: (meetingId: string) =>

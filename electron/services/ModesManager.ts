@@ -46,6 +46,8 @@ import {
     MODE_TEAM_MEET_PROMPT,
     MODE_LECTURE_PROMPT,
     MODE_TECHNICAL_INTERVIEW_PROMPT,
+    MODE_SDE_INTERVIEW_PROMPT,
+    MODE_AIML_INTERVIEW_PROMPT,
     // Campaign-3 (2026-07-19): 8th built-in mode prompt.
     MODE_SEMINAR_PROMPT,
     MODE_CALL_CENTER_PROMPT,
@@ -76,6 +78,8 @@ export type ModeTemplateType =
     | 'team-meet'
     | 'lecture'
     | 'technical-interview'
+    | 'sde-interview'
+    | 'aiml-interview'
     // Campaign-3 (fix/answer-policy-engine, 2026-07-19): 8th built-in mode.
     // Strict: evidence required, off-document Qs answered general-labeled
     // with a visible "not from your reference files" preamble.
@@ -146,6 +150,8 @@ export const MODE_TEMPLATES: Array<{
     { type: 'team-meet',            label: 'Team Meet',            description: 'Track action items and key decisions from meetings.' },
     { type: 'looking-for-work',     label: 'Looking for work',     description: 'Answer interview questions with confidence and clarity.' },
     { type: 'technical-interview',  label: 'Technical Interview',  description: 'Whiteboard-style coding and system design support.' },
+    { type: 'sde-interview',        label: 'SDE Interview',        description: 'Software Development Engineer: DSA, LeetCode problems, System Design, and clean code implementation.' },
+    { type: 'aiml-interview',       label: 'AI / ML Interview',    description: 'AI & Machine Learning Engineer: Deep Learning, PyTorch, Transformers, LLMs, Model Architecture & Training.' },
     { type: 'lecture',              label: 'Lecture',              description: 'Capture key concepts and content from lectures.' },
     // Campaign-3 (2026-07-19, fix/answer-policy-engine): 8th built-in mode.
     // "Seminar Mode" — strict file-grounded Q&A for presentations, thesis
@@ -207,6 +213,21 @@ export const TEMPLATE_NOTE_SECTIONS: Record<ModeTemplateType, Array<{ title: str
         { title: 'Hiring signal', description: 'Overall hire/no-hire signal and evidence; avoid inventing a final decision.' },
         { title: 'Follow-up', description: 'Next steps, additional questions, take-home, or interviewer follow-up.' },
     ],
+    'sde-interview': [
+        { title: 'Problem statement & constraints', description: 'The exact problem requirements, input/output types, edge cases, and time/space constraints.' },
+        { title: 'Optimal approach & algorithms', description: 'Chosen data structures, algorithmic paradigms (DP, sliding window, graph), and tradeoffs.' },
+        { title: 'Code & implementation', description: 'Clean, production-ready code with variable naming and modular logic.' },
+        { title: 'Dry run & complexity', description: 'Step-by-step trace with example inputs, Big-O time and space complexity analysis.' },
+        { title: 'System design & architecture', description: 'High-level components, data flows, APIs, scaling bottlenecks, and failure modes.' },
+        { title: 'Follow-up questions', description: 'Potential edge cases, scaling constraints, concurrency, or interviewer follow-ups.' },
+    ],
+    'aiml-interview': [
+        { title: 'Problem definition & objectives', description: 'ML task formulation (classification, regression, generation, embedding), inputs, and target metrics.' },
+        { title: 'Model architecture & loss', description: 'Model choices (Transformer, CNN, GNN), loss functions, attention mechanisms, and inductive biases.' },
+        { title: 'Training & optimization pipeline', description: 'Data preprocessing, batching, optimizers (AdamW), learning rate schedules, and regularization.' },
+        { title: 'Evaluation & metrics', description: 'Validation strategies, offline vs online metrics, ROC-AUC, F1, latency, and memory footprint.' },
+        { title: 'Production & scaling / MLOps', description: 'Inference latency, quantization, KV caching, vector search/RAG, and model serving.' },
+    ],
     lecture: [
         { title: 'Core concepts', description: 'Main concepts, frameworks, and claims from the lecture.' },
         { title: 'Definitions', description: 'Terms, definitions, formulas, and distinctions introduced.' },
@@ -250,6 +271,8 @@ export const TEMPLATE_SYSTEM_PROMPTS: Record<ModeTemplateType, string> = {
     // General = universal adaptive copilot (own prompt, not technical interview)
     general: MODE_GENERAL_PROMPT,
     'technical-interview': MODE_TECHNICAL_INTERVIEW_PROMPT,
+    'sde-interview': MODE_SDE_INTERVIEW_PROMPT,
+    'aiml-interview': MODE_AIML_INTERVIEW_PROMPT,
 
     'looking-for-work': MODE_LOOKING_FOR_WORK_PROMPT,
     sales: MODE_SALES_PROMPT,
@@ -594,6 +617,8 @@ export class ModesManager {
     // premium prompt/context injection — by gating the whole intercept here.
     private static readonly PREMIUM_INTERCEPT_INCOMPATIBLE_TEMPLATES: ReadonlySet<ModeTemplateType> = new Set([
         'technical-interview',
+        'sde-interview',
+        'aiml-interview',
         'team-meet',
         'lecture',
         'seminar',
@@ -861,7 +886,9 @@ export class ModesManager {
         hasLiveTranscriptCapable?: boolean;
     }): ModeSourceContract {
         const isInterviewPrep = input.templateType === 'looking-for-work'
-            || input.templateType === 'technical-interview';
+            || input.templateType === 'technical-interview'
+            || input.templateType === 'sde-interview'
+            || input.templateType === 'aiml-interview';
         const switches = input.switches.filter((s) => s !== 'transcript');
         // Interview-prep modes are profile-first BY DEFAULT — but not when the
         // user has explicitly said otherwise (2026-08-29).

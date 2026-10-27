@@ -129,6 +129,15 @@ export class RAGManager {
     private retriever: RAGRetriever;
     private llmHelper: LLMHelper | null = null;
     private liveIndexer: LiveRAGIndexer;
+    private sessionHistory: Array<{ role: 'user' | 'assistant'; text: string; timestamp: number }> = [];
+
+    public getSessionHistory(): Array<{ role: 'user' | 'assistant'; text: string; timestamp: number }> {
+        return [...this.sessionHistory];
+    }
+
+    public clearSessionHistory(): void {
+        this.sessionHistory = [];
+    }
     /**
      * Guards against concurrent reprocessMeeting()/reindex calls for the same
      * target. Process-wide on globalThis, not per-instance: RAGManager is
@@ -392,7 +401,8 @@ export class RAGManager {
      */
     async *queryGlobal(
         query: string,
-        abortSignal?: AbortSignal
+        abortSignal?: AbortSignal,
+        conversationHistory?: string
     ): AsyncGenerator<string, void, unknown> {
         if (!this.llmHelper) {
             throw new Error('LLM helper not initialized');
@@ -405,12 +415,18 @@ export class RAGManager {
         const isGreeting = /^(hi|hello|hey|good (morning|afternoon|evening)|howdy|greetings|sup)$/i.test(normalized);
 
         if (isAssistantIdentity) {
-            yield "I am **Natively**, your AI assistant and interview copilot.\n\nHere is how I can assist you:\n- **Meeting Intelligence**: Search and ask questions across your past meetings, review transcripts, summaries, and action items.\n- **Interview & Profile Assistance**: Practice technical questions, walk through your work experience, projects, and skills based on your uploaded resume and GitHub repositories.\n- **Live Technical Copilot**: Real-time coding assistance, system design feedback, and salary negotiation coaching.\n\nFeel free to ask me anything about your meetings, or ask me to walk through your experience!";
+            const idText = "I am **Natively**, your AI assistant and interview copilot.\n\nHere is how I can assist you:\n- **Meeting Intelligence**: Search and ask questions across your past meetings, review transcripts, summaries, and action items.\n- **Interview & Profile Assistance**: Practice technical questions, walk through your work experience, projects, and skills based on your uploaded resume and GitHub repositories.\n- **Live Technical Copilot**: Real-time coding assistance, system design feedback, and salary negotiation coaching.\n\nFeel free to ask me anything about your meetings, or ask me to walk through your experience!";
+            this.sessionHistory.push({ role: 'user', text: query, timestamp: Date.now() });
+            this.sessionHistory.push({ role: 'assistant', text: idText, timestamp: Date.now() });
+            yield idText;
             return;
         }
 
         if (isGreeting) {
-            yield "Hello! I am **Natively**, your AI assistant. How can I help you today with your meetings, technical interviews, or engineering projects?";
+            const greetText = "Hello! I am **Natively**, your AI assistant. How can I help you today with your meetings, technical interviews, or engineering projects?";
+            this.sessionHistory.push({ role: 'user', text: query, timestamp: Date.now() });
+            this.sessionHistory.push({ role: 'assistant', text: greetText, timestamp: Date.now() });
+            yield greetText;
             return;
         }
 
@@ -517,6 +533,15 @@ Generate a cohesive, highly articulate, confident first-person interview answer:
 
         let formatted = '';
         const contextParts: string[] = [];
+        const sessionHistoryText = conversationHistory || (this.sessionHistory.length > 0
+            ? this.sessionHistory
+                .slice(-10)
+                .map(m => `${m.role === 'user' ? 'User' : 'Assistant'}: ${m.text}`)
+                .join('\n')
+            : '');
+        if (sessionHistoryText) {
+            contextParts.push(`RECENT SESSION CHAT HISTORY (Current Turn Context):\n${sessionHistoryText}`);
+        }
         if (webContext) contextParts.push(webContext);
         if (profileContext) contextParts.push(profileContext);
         if (cleanMeetingContext) contextParts.push(`MEETING DISCUSSIONS & NOTES:\n${cleanMeetingContext}`);
@@ -542,9 +567,15 @@ Generate a cohesive, highly articulate, confident first-person interview answer:
         );
 
         const stallMs = this.llmHelper.isUsingOllama?.() ? 60_000 : RAG_STREAM_STALL_MS;
+        let fullAnswer = '';
         for await (const chunk of raceGeneratorWithDeadline(stream, stallMs)) {
             if (abortSignal?.aborted) break;
+            fullAnswer += chunk;
             yield chunk;
+        }
+        if (fullAnswer.trim().length > 0 && !abortSignal?.aborted) {
+            this.sessionHistory.push({ role: 'user', text: query, timestamp: Date.now() });
+            this.sessionHistory.push({ role: 'assistant', text: fullAnswer, timestamp: Date.now() });
         }
         // F7 (code-review 2026-08-14): surface an incomplete stream to the
         // reader. Without this, a capped or post-commit-failed stream ended
