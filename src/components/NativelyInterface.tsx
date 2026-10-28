@@ -3391,9 +3391,10 @@ const NativelyInterface: React.FC<NativelyInterfaceProps> = ({
 
   useEffect(() => {
     // When handbook viewer or in-flow drawers open or close, trigger size report so Electron window adapts smoothly
+    reportShellSize();
     const timer = setTimeout(() => {
       reportShellSize();
-    }, 40);
+    }, 180);
     return () => clearTimeout(timer);
   }, [handbookViewer, showRoleSelector, showFileMenu, reportShellSize]);
 
@@ -12097,9 +12098,9 @@ Provide only the answer, nothing else.`;
               {showAnswerPanel && (
                 <motion.div
                   ref={scrollContainerRef}
-                  className={`relative flex-1 overflow-y-auto overflow-x-hidden ${hasChatContent ? 'p-4 space-y-3' : 'p-0'} no-drag isolate`}
+                  className={`relative flex-1 overflow-y-auto overflow-x-hidden custom-scrollbar ${hasChatContent ? 'p-4 space-y-3' : 'p-0'} no-drag isolate`}
                   layout={false}
-                  style={{ scrollbarWidth: 'none', maxHeight: scrollMaxH, minHeight: scrollMinH }}
+                  style={{ maxHeight: scrollMaxH, minHeight: scrollMinH }}
                 >
                   {/* Every row spans the full inner width of the scroll
                                         container, which itself rides the shell's animated
@@ -12414,9 +12415,9 @@ Provide only the answer, nothing else.`;
                 </AnimatePresence>
                 {(() => {
                   if (handbookViewer) return null;
-                  const chipClass = `flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-medium border transition-all active:scale-95 duration-200 interaction-base interaction-press whitespace-nowrap shrink-0 ${quickActionClass}`;
+                  const chipClass = `flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-medium border transition-all active:scale-95 duration-200 interaction-base interaction-press whitespace-nowrap shrink-0 ${quickActionClass}`;
                   const answerChipClass = (recording: boolean) =>
-                    `flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-medium transition-all active:scale-95 duration-200 interaction-base interaction-press min-w-[74px] whitespace-nowrap shrink-0 ${
+                    `flex items-center justify-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-medium transition-all active:scale-95 duration-200 interaction-base interaction-press min-w-[68px] whitespace-nowrap shrink-0 ${
                       recording
                         ? 'bg-red-500/10 text-red-400 ring-1 ring-red-500/20'
                         : 'overlay-chip-surface overlay-text-interactive'
@@ -12428,22 +12429,22 @@ Provide only the answer, nothing else.`;
                   const ghost = (text: string) => <span className="ov-ghost-label" data-label={text} />;
                   const modeChipContent = (mode: 'recap' | 'brainstorm') =>
                     mode === 'brainstorm' ? (
-                      <span className="flex items-center gap-1.5">
-                        <Lightbulb className="w-3 h-3 opacity-70" /> {t('Brainstorm')}
+                      <span className="flex items-center gap-1">
+                        <Lightbulb className="w-3 h-3 opacity-70 shrink-0" /> {t('Brainstorm')}
                       </span>
                     ) : (
-                      <span className="flex items-center gap-1.5">
-                        <RefreshCw className="w-3 h-3 opacity-70" /> {t('Recap')}
+                      <span className="flex items-center gap-1">
+                        <RefreshCw className="w-3 h-3 opacity-70 shrink-0" /> {t('Recap')}
                       </span>
                     );
                   const answerContent = (
-                    <span className="flex items-center gap-1.5">
-                      <Mic className="w-3 h-3 opacity-70" /> {t('Answer')}
+                    <span className="flex items-center gap-1">
+                      <Mic className="w-3 h-3 opacity-70 shrink-0" /> {t('Answer')}
                     </span>
                   );
                   const stopContent = (
-                    <span className="flex items-center gap-1.5">
-                      <span className="w-1.5 h-1.5 rounded-full bg-red-400 animate-pulse" />
+                    <span className="flex items-center gap-1">
+                      <span className="w-1.5 h-1.5 rounded-full bg-red-400 animate-pulse shrink-0" />
                       {t('Stop')}
                     </span>
                   );
@@ -12452,11 +12453,11 @@ Provide only the answer, nothing else.`;
                   // Answer ⇄ Stop never slides the rest of the row sideways.
                   const answerSizers = (
                     <>
-                      <span className="ov-chip-sizer flex items-center gap-1.5" aria-hidden>
+                      <span className="ov-chip-sizer flex items-center gap-1" aria-hidden>
                         <span className="w-3 h-3 shrink-0" />
                         {ghost(t('Answer'))}
                       </span>
-                      <span className="ov-chip-sizer flex items-center gap-1.5" aria-hidden>
+                      <span className="ov-chip-sizer flex items-center gap-1" aria-hidden>
                         <span className="w-1.5 h-1.5 shrink-0" />
                         {ghost(t('Stop'))}
                       </span>
@@ -12467,26 +12468,26 @@ Provide only the answer, nothing else.`;
                   // measuring effect). Same classes and icons as the real
                   // chips; spans, not buttons, and CSS-drawn labels.
                   const measureRow = (mode: 'recap' | 'brainstorm', ref: React.RefObject<HTMLDivElement | null>) => (
-                    <div ref={ref} className="ov-row-measure flex flex-nowrap items-center gap-1.5 px-4" aria-hidden inert>
+                    <div ref={ref} className="ov-row-measure flex flex-nowrap items-center gap-1 px-3" aria-hidden inert>
                       <span className={chipClass} style={appearance.chipStyle}>
-                        <Pencil className="w-3 h-3 opacity-70" />
+                        <Pencil className="w-3 h-3 opacity-70 shrink-0" />
                         {ghost(t('What to answer?'))}
                       </span>
                       <span className={chipClass} style={appearance.chipStyle}>
-                        <MessageSquare className="w-3 h-3 opacity-70" />
+                        <MessageSquare className="w-3 h-3 opacity-70 shrink-0" />
                         {ghost(t('Clarify'))}
                       </span>
                       <span className={chipClass} style={appearance.chipStyle}>
                         {mode === 'brainstorm' ? (
-                          <Lightbulb className="w-3 h-3 opacity-70" />
+                          <Lightbulb className="w-3 h-3 opacity-70 shrink-0" />
                         ) : (
-                          <RefreshCw className="w-3 h-3 opacity-70" />
+                          <RefreshCw className="w-3 h-3 opacity-70 shrink-0" />
                         )}
                         {ghost(mode === 'brainstorm' ? t('Brainstorm') : t('Recap'))}
                       </span>
                       <span className={chipClass} style={appearance.chipStyle}>
-                        <HelpCircle className="w-3 h-3 opacity-70" />
-                        {ghost(t('Follow Up Question'))}
+                        <HelpCircle className="w-3 h-3 opacity-70 shrink-0" />
+                        {ghost(t('Follow Up'))}
                       </span>
                       <span className={answerChipClass(false)} style={appearance.chipStyle}>
                         <span className="ov-chip-stack">{answerSizers}</span>
@@ -12497,30 +12498,32 @@ Provide only the answer, nothing else.`;
                     <>
                       <div
                         ref={quickRowRef}
-                        className={`ov-chip-row ov-quickrow-pad flex flex-wrap justify-center items-center gap-1.5 px-4 pb-3 max-w-full overflow-visible ${rollingTranscript && showTranscript ? 'pt-1' : 'pt-3 is-bare'}`}
+                        className={`ov-chip-row ov-quickrow-pad flex flex-nowrap justify-center items-center gap-1 px-3 pb-2.5 max-w-full overflow-hidden ${rollingTranscript && showTranscript ? 'pt-1' : 'pt-2.5 is-bare'}`}
                       >
-                        <button onClick={handleWhatToSay} className={chipClass} style={appearance.chipStyle}>
-                          <Pencil className="w-3 h-3 opacity-70" /> {t('What to answer?')}
+                        <button onClick={handleWhatToSay} className={chipClass} style={appearance.chipStyle} title={t('What to answer?')}>
+                          <Pencil className="w-3 h-3 opacity-70 shrink-0" /> <span>{t('What to answer?')}</span>
                         </button>
-                        <button onClick={handleClarify} className={chipClass} style={appearance.chipStyle}>
-                          <MessageSquare className="w-3 h-3 opacity-70" /> {t('Clarify')}
+                        <button onClick={handleClarify} className={chipClass} style={appearance.chipStyle} title={t('Clarify')}>
+                          <MessageSquare className="w-3 h-3 opacity-70 shrink-0" /> <span>{t('Clarify')}</span>
                         </button>
                         <button
                           onClick={shownActionMode === 'brainstorm' ? handleBrainstorm : handleRecap}
                           className={chipClass}
                           style={appearance.chipStyle}
+                          title={shownActionMode === 'brainstorm' ? t('Brainstorm') : t('Recap')}
                         >
                           <SwapText swapKey={labelActionMode} onShown={handleModeLabelShown}>
                             {modeChipContent(labelActionMode)}
                           </SwapText>
                         </button>
-                        <button onClick={handleFollowUpQuestions} className={chipClass} style={appearance.chipStyle}>
-                          <HelpCircle className="w-3 h-3 opacity-70" /> {t('Follow Up Question')}
+                        <button onClick={handleFollowUpQuestions} className={chipClass} style={appearance.chipStyle} title={t('Follow Up Question')}>
+                          <HelpCircle className="w-3 h-3 opacity-70 shrink-0" /> <span>{t('Follow Up')}</span>
                         </button>
                         <button
                           onClick={handleAnswerNow}
                           className={answerChipClass(isManualRecording)}
                           style={isManualRecording ? undefined : appearance.chipStyle}
+                          title={isManualRecording ? t('Stop') : t('Answer')}
                         >
                           <span className="ov-chip-stack">
                             {answerSizers}
@@ -12710,6 +12713,7 @@ Provide only the answer, nothing else.`;
                       animate={{ opacity: 1, height: 'auto', y: 0 }}
                       exit={{ opacity: 0, height: 0, y: 4 }}
                       transition={{ duration: 0.16, ease: 'easeOut' }}
+                      onAnimationComplete={() => reportShellSize()}
                       className="w-full mt-2 rounded-xl border border-border-muted bg-bg-elevated/95 p-2.5 shadow-2xl backdrop-blur-xl text-text-primary no-drag overflow-hidden"
                       onClick={(e) => e.stopPropagation()}
                     >
@@ -12859,6 +12863,7 @@ Provide only the answer, nothing else.`;
                       animate={{ opacity: 1, height: 'auto', y: 0 }}
                       exit={{ opacity: 0, height: 0, y: 4 }}
                       transition={{ duration: 0.16, ease: 'easeOut' }}
+                      onAnimationComplete={() => reportShellSize()}
                       className="w-full mt-2 rounded-xl border border-border-muted bg-bg-elevated/95 p-2.5 shadow-2xl backdrop-blur-xl text-text-primary no-drag overflow-hidden"
                       onClick={(e) => e.stopPropagation()}
                     >
