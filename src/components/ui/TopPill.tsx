@@ -31,7 +31,7 @@ export default function TopPill({
           border
           overlay-pill-surface
           backdrop-blur-md
-          px-1.5 py-1.5
+          px-2.5 py-1.5 cursor-grab active:cursor-grabbing
           transition-all duration-300 ease-sculpted
         "
                 style={appearance.pillStyle}

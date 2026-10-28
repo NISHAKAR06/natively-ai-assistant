@@ -191,11 +191,11 @@ function useManagedGroupDrag(rootRef: React.RefObject<HTMLDivElement | null>): b
 
     const onPointerDown = (e: PointerEvent) => {
       if (e.button !== 0) return;
-      // Never begin a drag from interactive non-drag controls
+      // Never begin a drag from interactive non-drag controls unless designated drag handle
       const target = e.target as HTMLElement | null;
-      if (target?.closest?.('[data-no-drag="true"], a, input, select, textarea')) return;
-      // Standard buttons, unless they are the designated drag handle
-      if (target?.closest?.('button:not([data-drag-handle="true"]), [role="button"]')) return;
+      if (target?.closest?.('button, a, input, select, textarea, [role="button"]')) {
+        if (!target?.closest?.('[data-drag-handle="true"]')) return;
+      }
       dragging = true;
       startX = e.screenX;
       startY = e.screenY;
@@ -217,6 +217,13 @@ function useManagedGroupDrag(rootRef: React.RefObject<HTMLDivElement | null>): b
 
     const onPointerEnd = (e: PointerEvent) => {
       if (!dragging) return;
+      // On Windows, moving a window programmatically under an active pointer
+      // capture can emit WM_CAPTURECHANGED, causing Chromium to dispatch a transient
+      // pointercancel while the physical mouse button is still pressed (buttons === 1).
+      // Ignore such spurious cancel events so the group drag is not aborted mid-drag.
+      if (e.type === 'pointercancel' && (e.buttons & 1)) {
+        return;
+      }
       dragging = false;
       try {
         el.releasePointerCapture(e.pointerId);

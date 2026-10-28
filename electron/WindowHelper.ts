@@ -1877,8 +1877,12 @@ export class WindowHelper {
     // mid-drag. Moving the shell carries the children with it, preserving the
     // weld — which is the point: the group clamps as one entity.
     this.overlayWindow.on('moved', () => {
-      if (this.overlayGroupWelded && !this.auxSyncing && !this.overlayGroupDragging) {
+      if (!this.auxSyncing && !this.overlayGroupDragging) {
         this.clampOverlayGroupIntoWorkArea();
+        if (!this.overlayGroupWelded) {
+          this.positionOverlayAuxWindows();
+        }
+        this.repositionOverlayPopovers();
       }
     });
     this.overlayWindow.on('resize', () => {
@@ -2115,12 +2119,15 @@ export class WindowHelper {
     // Top: leave room for the pill above the shell, so the End-meeting and
     // Show buttons can never slide under the menu bar.
     const minY = workArea.y + WindowHelper.PILL_GAP + pillH;
-    const maxY = workArea.y + workArea.height - o.height;
-    // Horizontal: the shell is the widest member, so clamping it covers the
-    // pill (narrower, centered). The toggle is allowed to overhang — it is
-    // decorative chrome and already tucks inward via positionToggleWindow.
-    const minX = workArea.x;
-    const maxX = workArea.x + workArea.width - o.width;
+    // Allow the user to place the floating assistant anywhere down to the bottom
+    // edge of the work area, leaving at least a visible header/pill accessible.
+    const visibleHeaderH = 64;
+    const maxY = Math.max(minY, workArea.y + workArea.height - visibleHeaderH);
+    // Horizontal: keep at least 120px of the window within the work area so it
+    // cannot be lost off either edge, while allowing free movement across the display.
+    const keepMargin = 120;
+    const minX = workArea.x - o.width + keepMargin;
+    const maxX = workArea.x + workArea.width - keepMargin;
     return {
       x: Math.round(Math.min(Math.max(x, minX), Math.max(minX, maxX))),
       y: Math.round(Math.min(Math.max(y, minY), Math.max(minY, maxY))),
@@ -2137,6 +2144,7 @@ export class WindowHelper {
     try {
       overlay.setPosition(x, y);
       this.overlayBounds = overlay.getBounds();
+      this.positionOverlayAuxWindows();
       this.positionToggleWindow();
     } finally {
       this.auxSyncing = false;
