@@ -28,7 +28,7 @@ import { decideLauncherClose } from '../src/lib/launcherCloseDecision.mjs';
 import { DEV_SERVER_URL } from './devServerUrl';
 
 const isEnvDev = process.env.NODE_ENV === 'development';
-const isPackaged = app.isPackaged;
+const isPackaged = typeof app !== 'undefined' && app ? Boolean(app.isPackaged) : false;
 const inAppBundle = process.execPath.includes('.app/') || process.execPath.includes('.app\\');
 
 console.log(
@@ -632,15 +632,15 @@ export class WindowHelper {
 
         if (mode === 'none') {
           if (isMac) {
-            return app.isPackaged
+            return app?.isPackaged
               ? path.join(process.resourcesPath, 'assets', 'icon.png')
               : path.resolve(__dirname, '../../assets/icon.png');
           } else if (isWin) {
-            return app.isPackaged
+            return app?.isPackaged
               ? path.join(process.resourcesPath, 'assets/icons/win/icon.ico')
               : path.resolve(__dirname, '../../assets/icons/win/icon.ico');
           } else {
-            return app.isPackaged
+            return app?.isPackaged
               ? path.join(process.resourcesPath, 'assets', 'icon.png')
               : path.resolve(__dirname, '../../assets/icon.png');
           }
@@ -656,21 +656,21 @@ export class WindowHelper {
         if (!iconName) {
           // Defensive: unknown mode — use the real app icon, matching 'none'.
           if (isMac) {
-            return app.isPackaged
+            return app?.isPackaged
               ? path.join(process.resourcesPath, 'assets', 'icon.png')
               : path.resolve(__dirname, '../../assets/icon.png');
           } else if (isWin) {
-            return app.isPackaged
+            return app?.isPackaged
               ? path.join(process.resourcesPath, 'assets/icons/win/icon.ico')
               : path.resolve(__dirname, '../../assets/icons/win/icon.ico');
           }
-          return app.isPackaged
+          return app?.isPackaged
             ? path.join(process.resourcesPath, 'icon.png')
             : path.resolve(__dirname, '../../assets/icon.png');
         }
 
         const platformDir = isWin ? 'win' : 'mac';
-        return app.isPackaged
+        return app?.isPackaged
           ? path.join(process.resourcesPath, `assets/fakeicon/${platformDir}/${iconName}`)
           : path.resolve(__dirname, `../../assets/fakeicon/${platformDir}/${iconName}`);
       })(),

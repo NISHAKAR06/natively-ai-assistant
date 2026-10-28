@@ -9,7 +9,7 @@ import { allowRespawn, hasLiveRenderer, onRendererGone } from "./utils/rendererL
 // isDev predicate. A stray NODE_ENV=development in a packaged launch's
 // environment must not point this window at a dev server that doesn't exist
 // in a shipped build.
-const isDev = process.env.NODE_ENV === "development" && !app.isPackaged
+const isDev = process.env.NODE_ENV === "development" && !(typeof app !== 'undefined' && app?.isPackaged)
 
 const startUrl = isDev
     ? DEV_SERVER_URL
