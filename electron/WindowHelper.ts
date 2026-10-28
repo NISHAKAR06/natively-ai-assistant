@@ -2119,15 +2119,12 @@ export class WindowHelper {
     // Top: leave room for the pill above the shell, so the End-meeting and
     // Show buttons can never slide under the menu bar.
     const minY = workArea.y + WindowHelper.PILL_GAP + pillH;
-    // Allow the user to place the floating assistant anywhere down to the bottom
-    // edge of the work area, leaving at least a visible header/pill accessible.
-    const visibleHeaderH = 64;
-    const maxY = Math.max(minY, workArea.y + workArea.height - visibleHeaderH);
-    // Horizontal: keep at least 120px of the window within the work area so it
-    // cannot be lost off either edge, while allowing free movement across the display.
-    const keepMargin = 120;
-    const minX = workArea.x - o.width + keepMargin;
-    const maxX = workArea.x + workArea.width - keepMargin;
+    const maxY = workArea.y + workArea.height - o.height;
+    // Horizontal: the shell is the widest member, so clamping it covers the
+    // pill (narrower, centered). Clamping to the screen bounds ensures the
+    // floating assistant never slides off-screen.
+    const minX = workArea.x;
+    const maxX = workArea.x + workArea.width - o.width;
     return {
       x: Math.round(Math.min(Math.max(x, minX), Math.max(minX, maxX))),
       y: Math.round(Math.min(Math.max(y, minY), Math.max(minY, maxY))),
