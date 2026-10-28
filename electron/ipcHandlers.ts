@@ -8106,7 +8106,7 @@ export function initializeIpcHandlers(appState: AppState): void {
     // "nothing to include" — exactly the silent-mystery gap this feature's
     // trimmedFields notice exists to close, so a load failure should not be
     // invisible to both the notice AND the logs.
-    let referenceFiles: { fileName: string; content: string }[] = [];
+    let referenceFiles: { fileName: string; content: string; totalChars?: number }[] = [];
     try {
       const { ModesManager } = require('./services/ModesManager');
       let activeModeId = ModesManager.getInstance().getActiveModeInfo()?.id;
@@ -8136,6 +8136,31 @@ export function initializeIpcHandlers(appState: AppState): void {
             totalChars: content.length,
           };
         });
+      }
+
+      // Guarantee candidate portfolio is ALWAYS included across all modes and without active mode
+      if (!referenceFiles.some((f) => f.fileName.includes('Candidate_Portfolio_and_Projects'))) {
+        try {
+          const fs = require('fs');
+          const path = require('path');
+          const candPaths = [
+            path.resolve(__dirname, '../../knowledge-books/Candidate_Portfolio_and_Projects.md'),
+            path.resolve(__dirname, '../../resources/knowledge-books/Candidate_Portfolio_and_Projects.md'),
+            path.resolve(process.cwd(), 'knowledge-books/Candidate_Portfolio_and_Projects.md'),
+            path.resolve(process.cwd(), 'resources/knowledge-books/Candidate_Portfolio_and_Projects.md'),
+          ];
+          const found = candPaths.find((p: string) => fs.existsSync(p));
+          if (found) {
+            const candContent = fs.readFileSync(found, 'utf-8');
+            if (candContent) {
+              referenceFiles.push({
+                fileName: 'Candidate_Portfolio_and_Projects.md',
+                content: candContent.slice(0, DIRECT_ASSIST_MAX_CONTEXT_FIELD_CHARS),
+                totalChars: candContent.length,
+              });
+            }
+          }
+        } catch { /* non-fatal fallback */ }
       }
     } catch (error) {
       console.warn('[direct-assist] reference files unavailable, proceeding without them:', (error as Error)?.message);

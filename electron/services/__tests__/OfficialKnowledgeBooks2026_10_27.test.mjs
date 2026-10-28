@@ -445,3 +445,33 @@ test('Direct Assist Interview Copilot Grounding and Main Process Startup Path Re
   const pingContent = fs.readFileSync(pingPath, 'utf-8');
   assert.ok(pingContent.includes('function getUserDataDir()'), 'InstallPingManager must define getUserDataDir');
 });
+
+test('Floating Assistant Drag Layout Stability, Non-Collapsing Drag Handle, and Ubiquitous Candidate Knowledge', () => {
+  // 1. Verify TopPill suppresses collapse toggle on drag and provides drag handle
+  const topPillPath = path.join(projectRoot, 'src', 'components', 'ui', 'TopPill.tsx');
+  const topPillContent = fs.readFileSync(topPillPath, 'utf-8');
+  assert.ok(topPillContent.includes('wasDraggedRef'), 'TopPill must track wasDraggedRef to prevent collapse when dragging');
+  assert.ok(topPillContent.includes('data-drag-handle="true"'), 'TopPill center segment must mark data-drag-handle');
+  assert.ok(topPillContent.includes('data-no-drag="true"'), 'TopPill action buttons must mark data-no-drag');
+
+  // 2. Verify OverlayAuxWindows allows managed drag on drag-handle
+  const auxPath = path.join(projectRoot, 'src', 'components', 'OverlayAuxWindows.tsx');
+  const auxContent = fs.readFileSync(auxPath, 'utf-8');
+  assert.ok(auxContent.includes('data-drag-handle="true"'), 'OverlayAuxWindows must permit drag on data-drag-handle');
+
+  // 3. Verify NativelyInterface restores centering and avoids narrow collapse on drag release
+  const uiPath = path.join(projectRoot, 'src', 'components', 'NativelyInterface.tsx');
+  const uiContent = fs.readFileSync(uiPath, 'utf-8');
+  assert.ok(uiContent.includes('restoreCentering()'), 'NativelyInterface must invoke restoreCentering on resize release');
+  assert.ok(uiContent.includes('grid-cols-2 gap-1.5 max-h-[260px]'), 'Role selector and file menu drawers must render in 2-column grid with max height');
+
+  // 4. Verify ModesManager getReferenceFiles guarantees candidate portfolio
+  const mmPath = path.join(projectRoot, 'electron', 'services', 'ModesManager.ts');
+  const mmContent = fs.readFileSync(mmPath, 'utf-8');
+  assert.ok(mmContent.includes("Candidate_Portfolio_and_Projects.md"), 'ModesManager getReferenceFiles must inject candidate portfolio if missing');
+
+  // 5. Verify direct-assist stream in ipcHandlers guarantees candidate portfolio across all modes
+  const ipcPath = path.join(projectRoot, 'electron', 'ipcHandlers.ts');
+  const ipcContent = fs.readFileSync(ipcPath, 'utf-8');
+  assert.ok(ipcContent.includes("Candidate_Portfolio_and_Projects.md"), 'ipcHandlers direct-assist must inject candidate portfolio');
+});

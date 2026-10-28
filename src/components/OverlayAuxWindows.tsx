@@ -191,10 +191,11 @@ function useManagedGroupDrag(rootRef: React.RefObject<HTMLDivElement | null>): b
 
     const onPointerDown = (e: PointerEvent) => {
       if (e.button !== 0) return;
-      // Never begin a drag from a control — the pill's buttons (logo, expand,
-      // end-meeting) must keep behaving as buttons.
+      // Never begin a drag from interactive non-drag controls
       const target = e.target as HTMLElement | null;
-      if (target?.closest?.('button, a, input, select, textarea, [role="button"]')) return;
+      if (target?.closest?.('[data-no-drag="true"], a, input, select, textarea')) return;
+      // Standard buttons, unless they are the designated drag handle
+      if (target?.closest?.('button:not([data-drag-handle="true"]), [role="button"]')) return;
       dragging = true;
       startX = e.screenX;
       startY = e.screenY;

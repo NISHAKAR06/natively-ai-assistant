@@ -1,4 +1,6 @@
 import * as crypto from 'crypto';
+import * as fs from 'fs';
+import * as path from 'path';
 import { DatabaseManager } from '../db/DatabaseManager';
 import { isRetrievalFixEnabled } from '../context-intelligence/contracts/retrieval-flags';
 import { isProfileIntelligenceAllowed } from '../context-intelligence/policies/mode-policy-registry';
@@ -1221,7 +1223,35 @@ export class ModesManager {
     // ── Reference Files ───────────────────────────────────────────
 
     public getReferenceFiles(modeId: string): ModeReferenceFile[] {
-        return DatabaseManager.getInstance().getReferenceFiles(modeId).map(rowToFile);
+        const files = DatabaseManager.getInstance().getReferenceFiles(modeId).map(rowToFile);
+        if (!files.some(f => f.fileName.includes('Candidate_Portfolio_and_Projects'))) {
+            const candidateContent = this.getCandidatePortfolioContent();
+            if (candidateContent) {
+                files.push({
+                    id: `cand-${modeId}`,
+                    modeId,
+                    fileName: 'Candidate_Portfolio_and_Projects.md',
+                    content: candidateContent,
+                    createdAt: new Date().toISOString(),
+                });
+            }
+        }
+        return files;
+    }
+
+    private getCandidatePortfolioContent(): string {
+        try {
+            const candidateCandidates = [
+                path.resolve(__dirname, '../../knowledge-books/Candidate_Portfolio_and_Projects.md'),
+                path.resolve(__dirname, '../../resources/knowledge-books/Candidate_Portfolio_and_Projects.md'),
+                path.resolve(process.cwd(), 'knowledge-books/Candidate_Portfolio_and_Projects.md'),
+                path.resolve(process.cwd(), 'resources/knowledge-books/Candidate_Portfolio_and_Projects.md'),
+            ];
+            const candidatePath = candidateCandidates.find((p: string) => fs.existsSync(p));
+            return candidatePath && fs.existsSync(candidatePath) ? fs.readFileSync(candidatePath, 'utf-8') : '';
+        } catch {
+            return '';
+        }
     }
 
     /**

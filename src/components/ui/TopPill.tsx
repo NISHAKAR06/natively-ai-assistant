@@ -1,3 +1,4 @@
+import { useRef } from "react";
 import { ChevronUp, ChevronDown } from "lucide-react";
 import icon from "../icon.png";
 import type { OverlayAppearance } from "../../lib/overlayAppearance";
@@ -17,6 +18,9 @@ export default function TopPill({
     appearance,
     onLogoClick,
 }: TopPillProps) {
+    const pointerStartRef = useRef<{ x: number; y: number } | null>(null);
+    const wasDraggedRef = useRef(false);
+
     return (
         <div className="flex justify-center select-none z-50">
             <div
@@ -35,6 +39,7 @@ export default function TopPill({
                 <div className="draggable-area">
                     {/* LOGO BUTTON */}
                     <button
+                        data-no-drag="true"
                         onClick={onLogoClick}
                         className={`
               w-7 h-7
@@ -59,7 +64,26 @@ export default function TopPill({
 
                 {/* CENTER SEGMENT */}
                 <button
-                    onClick={onToggle}
+                    data-drag-handle="true"
+                    onPointerDown={(e) => {
+                        pointerStartRef.current = { x: e.screenX, y: e.screenY };
+                        wasDraggedRef.current = false;
+                    }}
+                    onPointerMove={(e) => {
+                        if (pointerStartRef.current) {
+                            const dist = Math.hypot(e.screenX - pointerStartRef.current.x, e.screenY - pointerStartRef.current.y);
+                            if (dist > 4) {
+                                wasDraggedRef.current = true;
+                            }
+                        }
+                    }}
+                    onClick={() => {
+                        if (wasDraggedRef.current) {
+                            wasDraggedRef.current = false;
+                            return;
+                        }
+                        onToggle();
+                    }}
                     className={`
             flex items-center gap-2
             group
@@ -87,6 +111,7 @@ export default function TopPill({
 
                 {/* STOP / QUIT BUTTON */}
                 <button
+                    data-no-drag="true"
                     onClick={onQuit}
                     className={`
             w-7 h-7

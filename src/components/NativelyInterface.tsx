@@ -4852,7 +4852,9 @@ const NativelyInterface: React.FC<NativelyInterfaceProps> = ({
               // the panel would simply stay at the dragged width.
               const autoPanel = codeExpandedRef.current
                 ? panelWidthForWindow(autoWidth)
-                : collapsedPanelForWindow(autoWidth);
+                : panelWidth >= (panelWidthForWindow(autoWidth) + collapsedPanelForWindow(autoWidth)) / 2
+                  ? panelWidthForWindow(autoWidth)
+                  : collapsedPanelForWindow(autoWidth);
               // Animated, not snapped: this is a release that hands the panel
               // back to auto sizing, and everything else auto sizing does to the
               // width is sprung. (The double-click RESET stays instant on
@@ -4875,11 +4877,16 @@ const NativelyInterface: React.FC<NativelyInterfaceProps> = ({
               customOverlayHeightRef.current = null;
               heightPinIsCeilingRef.current = false;
               heightPinStreamIdRef.current = null;
-              setHeightPinned(false);
+              if (hasContentRef.current || showRoleSelector || showFileMenu || handbookViewer) {
+                setHeightPinned(true);
+              } else {
+                setHeightPinned(false);
+              }
             } else if (plan.height === 'pin') {
               customOverlayHeightRef.current = settledHeight;
             }
             measureVerticalCap();
+            restoreCentering();
             // Clearing a pin leaves the WINDOW at the dragged size with nothing
             // to pull it back: the content did not move, so the ResizeObserver
             // stays silent. Report once.
@@ -12723,7 +12730,7 @@ Provide only the answer, nothing else.`;
                         </button>
                       </div>
 
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+                      <div className="grid grid-cols-2 gap-1.5 max-h-[260px] overflow-y-auto custom-scrollbar pr-0.5">
                         {/* SDE Role */}
                         <button
                           type="button"
@@ -12872,7 +12879,7 @@ Provide only the answer, nothing else.`;
                         </button>
                       </div>
 
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+                      <div className="grid grid-cols-2 gap-1.5 max-h-[260px] overflow-y-auto custom-scrollbar pr-0.5">
                         {/* Open File from Computer */}
                         <button
                           type="button"
