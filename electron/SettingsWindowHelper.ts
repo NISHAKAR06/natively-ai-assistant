@@ -13,7 +13,7 @@ const isDev = process.env.NODE_ENV === "development" && !(typeof app !== 'undefi
 
 const startUrl = isDev
     ? DEV_SERVER_URL
-    : `file://${path.join(app.getAppPath(), "dist/index.html")}`
+    : (app?.getAppPath ? `file://${path.join(app.getAppPath(), "dist/index.html")}` : `file://${path.resolve(__dirname, "../../dist/index.html")}`)
 
 type WindowActivationOptions = {
     activate?: boolean
