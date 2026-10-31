@@ -175,6 +175,7 @@ function useManagedGroupDrag(rootRef: React.RefObject<HTMLDivElement | null>): b
     const el = rootRef.current;
     if (!managed || !el) return;
 
+    let potentialDrag = false;
     let dragging = false;
     let startX = 0;
     let startY = 0;
@@ -191,52 +192,53 @@ function useManagedGroupDrag(rootRef: React.RefObject<HTMLDivElement | null>): b
 
     const onPointerDown = (e: PointerEvent) => {
       if (e.button !== 0) return;
-      // Never begin a drag from interactive non-drag controls unless designated drag handle
       const target = e.target as HTMLElement | null;
       if (target?.closest?.('button, a, input, select, textarea, [role="button"]')) {
         if (!target?.closest?.('[data-drag-handle="true"]')) return;
       }
-      dragging = true;
+      potentialDrag = true;
+      dragging = false;
       startX = e.screenX;
       startY = e.screenY;
-      try {
-        el.setPointerCapture(e.pointerId);
-      } catch {
-        // Capture is an optimisation; the listeners still work without it.
-      }
-      // Anchor main on the shell's current origin before any movement lands.
-      window.electronAPI?.sendOverlayGroupDrag?.({ phase: 'start' }).catch(() => {});
     };
 
     const onPointerMove = (e: PointerEvent) => {
-      if (!dragging) return;
+      if (!potentialDrag) return;
+      if (!dragging) {
+        const dist = Math.hypot(e.screenX - startX, e.screenY - startY);
+        if (dist < 4) return;
+        dragging = true;
+        try {
+          el.setPointerCapture(e.pointerId);
+        } catch {}
+        window.electronAPI?.sendOverlayGroupDrag?.({ phase: 'start' }).catch(() => {});
+      }
       // TOTAL offset from the drag's start, not the step since the last event.
       pending = { dx: e.screenX - startX, dy: e.screenY - startY };
       if (!frame) frame = requestAnimationFrame(flush);
     };
 
     const onPointerEnd = (e: PointerEvent) => {
-      if (!dragging) return;
-      // On Windows, moving a window programmatically under an active pointer
-      // capture can emit WM_CAPTURECHANGED, causing Chromium to dispatch a transient
-      // pointercancel while the physical mouse button is still pressed (buttons === 1).
-      // Ignore such spurious cancel events so the group drag is not aborted mid-drag.
+      if (!potentialDrag) return;
+      potentialDrag = false;
       if (e.type === 'pointercancel' && (e.buttons & 1)) {
         return;
       }
-      dragging = false;
-      try {
-        el.releasePointerCapture(e.pointerId);
-      } catch {
-        // Already released (pointercancel) — nothing to undo.
+      if (dragging) {
+        dragging = false;
+        try {
+          el.releasePointerCapture(e.pointerId);
+        } catch {
+          // Already released (pointercancel) — nothing to undo.
+        }
+        if (frame) {
+          cancelAnimationFrame(frame);
+          frame = 0;
+        }
+        flush();
+        // Settle: release the anchor and re-assert exact geometry.
+        window.electronAPI?.sendOverlayGroupDrag?.({ phase: 'end' }).catch(() => {});
       }
-      if (frame) {
-        cancelAnimationFrame(frame);
-        frame = 0;
-      }
-      flush();
-      // Settle: release the anchor and re-assert exact geometry.
-      window.electronAPI?.sendOverlayGroupDrag?.({ phase: 'end' }).catch(() => {});
     };
 
     el.addEventListener('pointerdown', onPointerDown);
@@ -310,7 +312,10 @@ export function OverlayPillWindow() {
         <TopPill
           expanded={state.expanded !== false}
           onToggle={() => sendAction('toggle-expand')}
-          onQuit={() => sendAction('end-meeting')}
+          onQuit={() => {
+            sendAction('end-meeting');
+            window.electronAPI?.setWindowMode?.('launcher').catch(() => {});
+          }}
           appearance={appearance}
           onLogoClick={() => window.electronAPI?.setWindowMode?.('launcher')}
         />

@@ -103,7 +103,7 @@ export const FileViewerModal: React.FC<FileViewerModalProps> = ({
     <div
       className={`relative flex flex-col w-full ${
         embedded
-          ? 'max-h-[460px] h-full rounded-2xl border border-cyan-500/30 bg-bg-elevated/95 shadow-2xl my-2'
+          ? 'h-[440px] max-h-[460px] rounded-2xl border border-cyan-500/30 bg-bg-elevated/95 shadow-2xl my-2'
           : 'max-w-4xl max-h-[85vh] h-[85vh] rounded-2xl border border-border-muted bg-bg-elevated shadow-2xl'
       } overflow-hidden select-text no-drag`}
       onClick={(e) => e.stopPropagation()}

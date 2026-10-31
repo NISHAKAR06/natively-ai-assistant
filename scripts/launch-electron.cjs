@@ -11,16 +11,11 @@ const appDir = path.resolve(__dirname, '..');
 const args = [appDir, ...process.argv.slice(2)];
 
 const child = spawn(electron, args, {
-  stdio: 'inherit',
+  detached: true,
+  stdio: 'ignore',
   env,
-  windowsHide: false,
+  windowsHide: true,
 });
 
-child.on('error', (err) => {
-  console.error('[launch-electron] Failed to launch electron:', err);
-  process.exit(1);
-});
-
-child.on('exit', (code) => {
-  process.exit(code || 0);
-});
+child.unref();
+process.exit(0);

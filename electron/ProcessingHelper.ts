@@ -6,8 +6,10 @@ import { CredentialsManager } from "./services/CredentialsManager"
 import { app } from "electron"
 // import dotenv from "dotenv" // Removed static import
 
-if (!app.isPackaged) {
-  require("dotenv").config()
+if (!app?.isPackaged) {
+  try {
+    require("dotenv").config()
+  } catch {}
 }
 
 const isDev = process.env.NODE_ENV === "development"
@@ -26,7 +28,7 @@ export class ProcessingHelper {
     // Check if user wants to use Ollama. DEVELOPMENT ONLY, like the key reads
     // below — see that comment for why a packaged build must not consult
     // process.env here.
-    const useOllama = !app.isPackaged && process.env.USE_OLLAMA === "true"
+    const useOllama = !app?.isPackaged && process.env.USE_OLLAMA === "true"
     const ollamaModel = process.env.OLLAMA_MODEL // Don't set default here, let LLMHelper auto-detect
     const ollamaUrl = process.env.OLLAMA_URL || "http://localhost:11434"
 
@@ -46,12 +48,13 @@ export class ProcessingHelper {
       // var would silently become an active credential. See
       // CredentialEnvFallbackScope2026_09_08.test.mjs for the other half of
       // this bug class.
-      let apiKey = app.isPackaged ? undefined : process.env.GEMINI_API_KEY
-      let groqApiKey = app.isPackaged ? undefined : process.env.GROQ_API_KEY
-      let openaiApiKey = app.isPackaged ? undefined : process.env.OPENAI_API_KEY
-      let claudeApiKey = app.isPackaged ? undefined : process.env.CLAUDE_API_KEY
-      let deepseekApiKey = app.isPackaged ? undefined : process.env.DEEPSEEK_API_KEY
-      let nvidiaNimApiKey = app.isPackaged ? undefined : process.env.NVIDIA_NIM_API_KEY
+      const isPackaged = !!app?.isPackaged
+      let apiKey = isPackaged ? undefined : process.env.GEMINI_API_KEY
+      let groqApiKey = isPackaged ? undefined : process.env.GROQ_API_KEY
+      let openaiApiKey = isPackaged ? undefined : process.env.OPENAI_API_KEY
+      let claudeApiKey = isPackaged ? undefined : process.env.CLAUDE_API_KEY
+      let deepseekApiKey = isPackaged ? undefined : process.env.DEEPSEEK_API_KEY
+      let nvidiaNimApiKey = isPackaged ? undefined : process.env.NVIDIA_NIM_API_KEY
 
       // Allow initializing without key (will be loaded in loadStoredCredentials or via Settings)
       if (!apiKey) {

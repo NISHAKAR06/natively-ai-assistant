@@ -518,6 +518,7 @@ export class WindowHelper {
       appliedBounds: this.overlayBounds,
       contentSizeAfter: appliedContentSize,
     });
+    this.positionOverlayAuxWindows();
     return { width: appliedContentSize[0], height: appliedContentSize[1] };
   }
 
@@ -632,15 +633,15 @@ export class WindowHelper {
 
         if (mode === 'none') {
           if (isMac) {
-            return app?.isPackaged
+            return app.isPackaged
               ? path.join(process.resourcesPath, 'assets', 'icon.png')
               : path.resolve(__dirname, '../../assets/icon.png');
           } else if (isWin) {
-            return app?.isPackaged
+            return app.isPackaged
               ? path.join(process.resourcesPath, 'assets/icons/win/icon.ico')
               : path.resolve(__dirname, '../../assets/icons/win/icon.ico');
           } else {
-            return app?.isPackaged
+            return app.isPackaged
               ? path.join(process.resourcesPath, 'assets', 'icon.png')
               : path.resolve(__dirname, '../../assets/icon.png');
           }
@@ -656,21 +657,21 @@ export class WindowHelper {
         if (!iconName) {
           // Defensive: unknown mode — use the real app icon, matching 'none'.
           if (isMac) {
-            return app?.isPackaged
+            return app.isPackaged
               ? path.join(process.resourcesPath, 'assets', 'icon.png')
               : path.resolve(__dirname, '../../assets/icon.png');
           } else if (isWin) {
-            return app?.isPackaged
+            return app.isPackaged
               ? path.join(process.resourcesPath, 'assets/icons/win/icon.ico')
               : path.resolve(__dirname, '../../assets/icons/win/icon.ico');
           }
-          return app?.isPackaged
+          return app.isPackaged
             ? path.join(process.resourcesPath, 'icon.png')
             : path.resolve(__dirname, '../../assets/icon.png');
         }
 
         const platformDir = isWin ? 'win' : 'mac';
-        return app?.isPackaged
+        return app.isPackaged
           ? path.join(process.resourcesPath, `assets/fakeicon/${platformDir}/${iconName}`)
           : path.resolve(__dirname, `../../assets/fakeicon/${platformDir}/${iconName}`);
       })(),
@@ -2036,7 +2037,9 @@ export class WindowHelper {
     const workArea = this.getDisplayWorkArea(o);
     const { width: pw, height: ph } = this.pillSize;
     const panelCentre =
-      this.togglePanelLeft !== null
+      typeof this.togglePanelLeft === 'number' &&
+      typeof this.togglePanelRight === 'number' &&
+      this.togglePanelRight > this.togglePanelLeft
         ? (this.togglePanelLeft + this.togglePanelRight) / 2
         : o.width / 2;
     // Clamp into the work area: the old single-window layout could never lose
@@ -2121,8 +2124,8 @@ export class WindowHelper {
     const minY = workArea.y + WindowHelper.PILL_GAP + pillH;
     const maxY = workArea.y + workArea.height - o.height;
     // Horizontal: the shell is the widest member, so clamping it covers the
-    // pill (narrower, centered). Clamping to the screen bounds ensures the
-    // floating assistant never slides off-screen.
+    // pill (narrower, centered). The toggle is allowed to overhang — it is
+    // decorative chrome and already tucks inward via positionToggleWindow.
     const minX = workArea.x;
     const maxX = workArea.x + workArea.width - o.width;
     return {
@@ -2136,11 +2139,12 @@ export class WindowHelper {
     if (!overlay || overlay.isDestroyed()) return;
     const o = overlay.getBounds();
     const { x, y } = this.clampedGroupOrigin(o.x, o.y);
-    if (x === o.x && y === o.y) return;
     this.auxSyncing = true;
     try {
-      overlay.setPosition(x, y);
-      this.overlayBounds = overlay.getBounds();
+      if (x !== o.x || y !== o.y) {
+        overlay.setPosition(x, y);
+        this.overlayBounds = overlay.getBounds();
+      }
       this.positionOverlayAuxWindows();
       this.positionToggleWindow();
     } finally {

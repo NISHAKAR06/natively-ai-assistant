@@ -1472,28 +1472,58 @@ const NativelyInterface: React.FC<NativelyInterfaceProps> = ({
       setHandbookViewer(null);
       return;
     }
+    setShowRoleSelector(false);
+    setShowFileMenu(false);
     const api = (window as any).electronAPI;
-    if (!api?.knowledgeBooksGetBooks) return;
-    try {
-      const res = await api.knowledgeBooksGetBooks();
-      if (res?.success && Array.isArray(res.books) && res.books.length > 0) {
-        const isAiml = (activeModeLabel || '').toLowerCase().includes('ai') || (activeModeLabel || '').toLowerCase().includes('ml');
-        const defaultBook =
-          (isAiml ? res.books.find((b: any) => b.id.includes('aiml')) : res.books.find((b: any) => b.id.includes('sde'))) ||
-          res.books[0];
-        setHandbookViewer({
-          isOpen: true,
-          title: defaultBook.title,
-          fileName: defaultBook.fileName,
-          content: defaultBook.content,
-          filePath: defaultBook.path,
-          bookId: defaultBook.id,
-          availableBooks: res.books,
-        });
+    let books: Array<any> = [];
+    if (api?.knowledgeBooksGetBooks) {
+      try {
+        const res = await api.knowledgeBooksGetBooks();
+        if (res?.success && Array.isArray(res.books) && res.books.length > 0) {
+          books = res.books;
+        }
+      } catch (e) {
+        console.warn('knowledgeBooksGetBooks IPC error, using fallback:', e);
       }
-    } catch (e) {
-      console.error('Error opening handbook viewer:', e);
     }
+    if (books.length === 0) {
+      books = [
+        {
+          id: 'sde-handbook',
+          title: 'Official SDE Interview Knowledge Handbook',
+          role: 'sde-interview',
+          fileName: 'SDE_Interview_Official_Handbook.md',
+          content: '# Official SDE Interview Knowledge Handbook\n\n## 1. System Design & Distributed Systems\n\n### Cohesion and Coupling\n- **Cohesion**: Measure of how strongly related and focused the responsibilities of a single module are.\n- **Coupling**: Degree of interdependence between software modules.\n\n### Verification and Validation\n- **Verification**: Are we building the product right?\n- **Validation**: Are we building the right product?\n\n## 2. Data Structures & Algorithms\n- Dynamic Programming, Trees, Graphs, Sorting, Searching.',
+        },
+        {
+          id: 'aiml-handbook',
+          title: 'Official AI/ML Interview Knowledge Handbook',
+          role: 'aiml-interview',
+          fileName: 'AIML_Interview_Official_Handbook.md',
+          content: '# Official AI/ML Interview Knowledge Handbook\n\n## 1. Transformer Architecture & Deep Learning\n- Multi-head Self-Attention, Positional Encoding, Layer Normalization, Residual Connections.\n\n## 2. Evaluation Metrics\n- Confusion Matrix, Precision, Recall, F1-Score, ROC-AUC.\n\n## 3. Production ML & Drift\n- **Data Drift**: Distribution of input data changes.\n- **Concept Drift**: Statistical properties of target variable change over time.',
+        },
+        {
+          id: 'candidate-portfolio',
+          title: 'Candidate Technical Portfolio & Projects (Nishakar T)',
+          role: 'all',
+          fileName: 'Candidate_Portfolio_and_Projects.md',
+          content: '# Candidate Technical Portfolio & Projects\n\n**Candidate:** Nishakar T\n**Roles:** AI/ML Engineer, SDE\n\n## Key Projects\n1. **Threshold AI**: Autonomous multi-agent verification system with state graph feedback loop (8th Node: FeedbackStateNode).\n2. **Health Forecast AI / MediQuery AI**: Healthcare readmission prediction pipeline addressing ~11% positive class imbalance using SMOTE and calibrated gradient-boosted trees.',
+        },
+      ];
+    }
+    const isAiml = (activeModeLabel || '').toLowerCase().includes('ai') || (activeModeLabel || '').toLowerCase().includes('ml');
+    const defaultBook =
+      (isAiml ? books.find((b: any) => b.id.includes('aiml')) : books.find((b: any) => b.id.includes('sde'))) ||
+      books[0];
+    setHandbookViewer({
+      isOpen: true,
+      title: defaultBook.title,
+      fileName: defaultBook.fileName,
+      content: defaultBook.content,
+      filePath: defaultBook.path,
+      bookId: defaultBook.id,
+      availableBooks: books,
+    });
   };
 
   const handlePickAndOpenFile = async () => {
@@ -1598,12 +1628,14 @@ const NativelyInterface: React.FC<NativelyInterfaceProps> = ({
     };
     const handleClickOutside = (e: MouseEvent) => {
       const target = e.target as HTMLElement | null;
+      if (!target) return;
+      const el = target instanceof Element ? target : (target as Node).parentElement;
       if (
-        target &&
-        !target.closest('[data-role-selector-root]') &&
-        !target.closest('[data-role-selector-toggle]') &&
-        !target.closest('[data-file-menu-root]') &&
-        !target.closest('[data-file-menu-toggle]')
+        el &&
+        !el.closest('[data-role-selector-root]') &&
+        !el.closest('[data-role-selector-toggle]') &&
+        !el.closest('[data-file-menu-root]') &&
+        !el.closest('[data-file-menu-toggle]')
       ) {
         setShowRoleSelector(false);
         setShowFileMenu(false);
@@ -3391,10 +3423,9 @@ const NativelyInterface: React.FC<NativelyInterfaceProps> = ({
 
   useEffect(() => {
     // When handbook viewer or in-flow drawers open or close, trigger size report so Electron window adapts smoothly
-    reportShellSize();
     const timer = setTimeout(() => {
       reportShellSize();
-    }, 180);
+    }, 40);
     return () => clearTimeout(timer);
   }, [handbookViewer, showRoleSelector, showFileMenu, reportShellSize]);
 
@@ -12058,7 +12089,7 @@ Provide only the answer, nothing else.`;
                   Always mounted: it is the box that plays the contract to 0 after
                   the scroller has gone. */}
               {handbookViewer && (
-                <div className="w-full px-3 py-1">
+                <div className="w-full px-2 py-1 no-drag" style={{ minHeight: 440 }}>
                   <FileViewerModal
                     isOpen={handbookViewer.isOpen}
                     onClose={() => setHandbookViewer(null)}
@@ -12088,7 +12119,6 @@ Provide only the answer, nothing else.`;
                 </div>
               )}
 
-              {!handbookViewer && (
               <motion.div
                 ref={viewportBoxRef}
                 data-viewport-box=""
@@ -12198,7 +12228,6 @@ Provide only the answer, nothing else.`;
                 </motion.div>
               )}
               </motion.div>
-              )}
 
               {/* Quick Actions - Minimal & Clean.
                   Split into an outer positioning-only wrapper + an inner row
@@ -12709,11 +12738,10 @@ Provide only the answer, nothing else.`;
                   {showRoleSelector && (
                     <motion.div
                       data-role-selector-root=""
-                      initial={{ opacity: 0, height: 0, y: 4 }}
-                      animate={{ opacity: 1, height: 'auto', y: 0 }}
-                      exit={{ opacity: 0, height: 0, y: 4 }}
-                      transition={{ duration: 0.16, ease: 'easeOut' }}
-                      onAnimationComplete={() => reportShellSize()}
+                      initial={{ opacity: 0, y: 6 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: 6 }}
+                      transition={{ duration: 0.15, ease: 'easeOut' }}
                       className="w-full mt-2 rounded-xl border border-border-muted bg-bg-elevated/95 p-2.5 shadow-2xl backdrop-blur-xl text-text-primary no-drag overflow-hidden"
                       onClick={(e) => e.stopPropagation()}
                     >
@@ -12859,11 +12887,10 @@ Provide only the answer, nothing else.`;
                   {showFileMenu && (
                     <motion.div
                       data-file-menu-root=""
-                      initial={{ opacity: 0, height: 0, y: 4 }}
-                      animate={{ opacity: 1, height: 'auto', y: 0 }}
-                      exit={{ opacity: 0, height: 0, y: 4 }}
-                      transition={{ duration: 0.16, ease: 'easeOut' }}
-                      onAnimationComplete={() => reportShellSize()}
+                      initial={{ opacity: 0, y: 6 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: 6 }}
+                      transition={{ duration: 0.15, ease: 'easeOut' }}
                       className="w-full mt-2 rounded-xl border border-border-muted bg-bg-elevated/95 p-2.5 shadow-2xl backdrop-blur-xl text-text-primary no-drag overflow-hidden"
                       onClick={(e) => e.stopPropagation()}
                     >
@@ -13141,6 +13168,7 @@ Provide only the answer, nothing else.`;
                       onClick={() => {
                         setShowRoleSelector((prev) => !prev);
                         setShowFileMenu(false);
+                        setHandbookViewer(null);
                       }}
                       title={t('Current Interview Role: Click to switch between SDE, AI/ML, and General')}
                       className={`
@@ -13188,6 +13216,7 @@ Provide only the answer, nothing else.`;
                         const nextState = !showFileMenu;
                         setShowFileMenu(nextState);
                         setShowRoleSelector(false);
+                        setHandbookViewer(null);
                         if (nextState && activeRoleTrack) {
                           window.electronAPI?.modesGetReferenceFiles?.(activeRoleTrack).then((files: any) => {
                             if (Array.isArray(files)) setAttachedModeFiles(files);
@@ -13244,9 +13273,10 @@ Provide only the answer, nothing else.`;
                     </div>
 
                     {/* Official Technical Interview Handbooks Viewer */}
-                    <div className="relative">
+                    <div className="relative no-drag">
                       <button
                         type="button"
+                        data-no-drag="true"
                         onClick={() => void handleToggleHandbookViewer()}
                         title={handbookViewer ? t('Close Handbook Viewer (Esc)') : t('Official Technical Interview Handbooks (SDE & AI/ML)')}
                         className={`w-7 h-7 rounded-[9px] flex items-center justify-center interaction-base interaction-press transition-colors cursor-pointer no-drag ${
